@@ -2,9 +2,9 @@
 
 const browserCapabilities = require("./browserCapabilities");
 const libbrstm = require("brstm");
-const { STREAMING_MIN_RESPONSE } = require("./configProvider");
-const copyToChannelPolyfill = require("./copyToChannelPolyfill");
 const gui = require("./gui");
+import { STREAMING_MIN_RESPONSE } from "./configProvider";
+import copyToChannelPolyfill from "./copyToChannelPolyfill";
 import resampler from "./resampler";
 import unlock from "./webAudioUnlock";
 const sleep = (timeout) =>
