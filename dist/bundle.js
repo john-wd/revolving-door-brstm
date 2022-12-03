@@ -119,852 +119,13 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
         });
     };
 
-    // @ts-check
-
-    /**
-     *
-     * @param {Uint8Array} uint8Array
-     * @param {number} start
-     * @param {number} length
-     * @returns {Array<number>}
-     */
-    function getSlice(uint8Array, start, length) {
-      const result = [];
-      for (let i = start; i < start + length; i++) {
-        // Apparently unsigned
-        result.push(uint8Array[i]);
-      }
-      return result;
+    function createCommonjsModule(fn) {
+      var module = { exports: {} };
+    	return fn(module, module.exports), module.exports;
     }
 
-    /**
-     * Endianness
-     */
-    const ENDIAN = {
-      LITTLE: 0,
-      BIG: 1,
-    };
-
-    /**
-     *
-     * Determined from Byte Order Mark (BOM):
-     * - 0xFF 0xFE for little endian
-     * - 0xFE 0xFF for big endian
-     *
-     * @param {Uint8Array} uint8Array
-     * @returns {number} 0 or 1, 0 denotes little endian; defaults to big endian (1)
-     */
-    function getEndianness(uint8Array) {
-      const byteOrderMark = getSlice(uint8Array, 4, 2);
-      if (byteOrderMark[0] === 255 && byteOrderMark[1] === 254) {
-        return ENDIAN.LITTLE;
-      }
-
-      return ENDIAN.BIG;
-    }
-
-    /**
-     *
-     * @param {Uint8Array} uint8Array
-     * @param {number} start
-     * @param {number} length
-     * @param {number} endianness
-     * @returns {string}
-     */
-    function getSliceAsString(
-      uint8Array,
-      start,
-      length,
-      endianness = ENDIAN.BIG
-    ) {
-      const resArr = getSlice(uint8Array, start, length);
-      if (endianness === ENDIAN.LITTLE) {
-        resArr.reverse();
-      }
-      return String.fromCharCode(...resArr);
-    }
-
-    /**
-     *
-     * @param {Uint8Array} uint8Array
-     * @param {number} start
-     * @param {number} length
-     * @param {number} endianness
-     * @returns {number}
-     */
-    function getSliceAsNumber(
-      uint8Array,
-      start,
-      length,
-      endianness = ENDIAN.BIG
-    ) {
-      const resArr = getSlice(uint8Array, start, length);
-      if (endianness === ENDIAN.LITTLE) {
-        resArr.reverse();
-      }
-      return resArr.reduce((acc, curr) => acc * 256 + curr, 0);
-    }
-
-    /**
-     *
-     * @param {number} value
-     * @param {number} min
-     * @param {number} max
-     * @returns {number} clamped value to be in between min and max (inclusive)
-     */
-    function clamp(value, min, max) {
-      return value <= min ? min : value >= max ? max : value;
-    }
-
-    /**
-     *
-     * @param {number} num Uint16
-     */
-    function getInt16(num) {
-      return num >= 0x8000 ? num - 0x10000 : num;
-    }
-
-    // @ts-check
-
-    /**
-     * @typedef {Object} ChannelInfo
-     * @property {Array<number>} adpcmCoefficients
-     * @property {number} gain
-     * @property {number} initialPredictorScale
-     * @property {number} historySample1
-     * @property {number} historySample2
-     * @property {number} loopPredictorScale
-     * @property {number} loopHistorySample1
-     * @property {number} loopHistorySample2
-     */
-
-    /**
-     * @exports
-     * @typedef {Object} Metadata
-     * @property {number} fileSize
-     * @property {number} endianness 0 - little endian, 1 - big endian
-     * @property {number} codec
-     *   - 0 - 8-bit PCM
-     *   - 1 - 16-bit PCM
-     *   - 2 - 4-bit ADPCM
-     * @property {number} loopFlag
-     * @property {number} numberChannels
-     * @property {number} sampleRate
-     * @property {number} loopStartSample loop start, in terms of sample #
-     * @property {number} totalSamples
-     * @property {number} totalBlocks total number of blocks, per channel, including final block
-     * @property {number} blockSize
-     * @property {number} samplesPerBlock
-     * @property {number} finalBlockSize Final block size, without padding, in bytes
-     * @property {number} finalBlockSizeWithPadding Final block size, **with** padding, in bytes
-     * @property {number} totalSamplesInFinalBlock Total samples in final block
-     * @property {number} adpcTableSamplesPerEntry Samples per entry in ADPC table
-     * @property {number} adpcTableBytesPerEntry Bytes per entry in ADPC table
-     * @property {number} numberTracks Number of tracks
-     * @property {number} trackDescriptionType Track description type ??
-     */
-
-    /**
-     * @class
-     */
-    class Brstm {
-      /**
-       *
-       * @param {ArrayBuffer} arrayBuffer
-       */
-      constructor(arrayBuffer) {
-        /**
-         * @type {Uint8Array} rawData
-         */
-        this.rawData = new Uint8Array(arrayBuffer);
-
-        if (getSliceAsString(this.rawData, 0, 4) !== 'RSTM') {
-          throw new Error('Not a valid BRSTM file');
-        }
-
-        /**
-         * @type {number} 0 - little endian, 1 - big endian
-         */
-        this.endianness = getEndianness(this.rawData);
-
-        /**
-         * @private
-         * @type {number} _offsetToHead Offset to HEAD chunk, relative to beginning of file
-         */
-        this._offsetToHead = getSliceAsNumber(
-          this.rawData,
-          0x10,
-          4,
-          this.endianness
-        );
-        /**
-         * @private
-         * @type {number} _offsetToHeadChunk1 Offset to HEAD chunk part 1, relative to beginning of file
-         */
-        this._offsetToHeadChunk1 =
-          this._offsetToHead +
-          getSliceAsNumber(
-            this.rawData,
-            this._offsetToHead + 0x0c,
-            4,
-            this.endianness
-          ) +
-          0x08;
-        /**
-         * @private
-         * @type {number} _offsetToHeadChunk2 Offset to HEAD chunk part 2, relative to beginning of file
-         */
-        this._offsetToHeadChunk2 =
-          this._offsetToHead +
-          getSliceAsNumber(
-            this.rawData,
-            this._offsetToHead + 0x14,
-            4,
-            this.endianness
-          ) +
-          0x08;
-        /**
-         * @private
-         * @type {number} _offsetToHeadChunk3 Offset to HEAD chunk part 3, relative to beginning of file
-         */
-        this._offsetToHeadChunk3 =
-          this._offsetToHead +
-          getSliceAsNumber(
-            this.rawData,
-            this._offsetToHead + 0x1c,
-            4,
-            this.endianness
-          ) +
-          0x08;
-        /**
-         * @private
-         * @type {number} _offsetToAdpc Offset to ADPC chunk, relative to beginning of file
-         */
-        this._offsetToAdpc = getSliceAsNumber(
-          this.rawData,
-          0x18,
-          4,
-          this.endianness
-        );
-        /**
-         * @private
-         * @type {number} _offsetToData Offset to DATA, relative to beginning of file
-         */
-        this._offsetToData = getSliceAsNumber(
-          this.rawData,
-          0x20,
-          4,
-          this.endianness
-        );
-
-        /**
-         * @type {Metadata} metadata
-         */
-        this.metadata = this._getMetadata();
-
-        /**
-         * @private
-         * @type {?Array<Int16Array>} _cachedSamples per-channel samples
-         */
-        this._cachedSamples = null;
-
-        /**
-         * @type {?Array<Array<{yn1: number, yn2: number}>>}
-         */
-        this._partitionedAdpcChunkData = null;
-
-        /**
-         * @type {?Array<ChannelInfo>}
-         */
-        this._cachedChannelInfo = null;
-
-        /**
-         * @private
-         * @type {Array<Array<Int16Array>>} per-channel (`c) samples at block `b`. Access by _cachedBlockResults[b][c]
-         */
-        this._cachedBlockResults = [];
-      }
-
-      /**
-       * @returns {Array<ChannelInfo>}
-       */
-      _getChannelInfo() {
-        if (this._cachedChannelInfo) {
-          return this._cachedChannelInfo;
-        }
-        const { numberChannels } = this.metadata;
-        const channelInfo = [];
-
-        for (let c = 0; c < numberChannels; c++) {
-          const offsetToChannelInfo =
-            this._offsetToHead +
-            getSliceAsNumber(
-              this.rawData,
-              this._offsetToHeadChunk3 + 0x08 + c * 8,
-              4,
-              this.endianness
-            ) +
-            0x08 +
-            8;
-          /**
-           * @type {Array<number>}
-           */
-          const adpcmCoefficients = [];
-          for (let i = 0; i < 16; i++) {
-            const num = getSliceAsNumber(
-              this.rawData,
-              offsetToChannelInfo + 2 * i,
-              2,
-              this.endianness
-            );
-            // Covert number to int16
-            adpcmCoefficients.push(getInt16(num));
-          }
-
-          channelInfo.push({
-            adpcmCoefficients,
-            gain: getSliceAsNumber(
-              this.rawData,
-              offsetToChannelInfo + 0x28,
-              2,
-              this.endianness
-            ),
-
-            initialPredictorScale: getSliceAsNumber(
-              this.rawData,
-              offsetToChannelInfo + 0x2a,
-              2,
-              this.endianness
-            ),
-
-            historySample1: getSliceAsNumber(
-              this.rawData,
-              offsetToChannelInfo + 0x2c,
-              2,
-              this.endianness
-            ),
-
-            historySample2: getSliceAsNumber(
-              this.rawData,
-              offsetToChannelInfo + 0x2e,
-              2,
-              this.endianness
-            ),
-
-            loopPredictorScale: getSliceAsNumber(
-              this.rawData,
-              offsetToChannelInfo + 0x30,
-              2,
-              this.endianness
-            ),
-
-            loopHistorySample1: getSliceAsNumber(
-              this.rawData,
-              offsetToChannelInfo + 0x32,
-              2,
-              this.endianness
-            ),
-
-            loopHistorySample2: getSliceAsNumber(
-              this.rawData,
-              offsetToChannelInfo + 0x34,
-              2,
-              this.endianness
-            ),
-          });
-        }
-        this._cachedChannelInfo = channelInfo;
-        return channelInfo;
-      }
-
-      _getMetadata() {
-        const numberChannels = getSliceAsNumber(
-          this.rawData,
-          this._offsetToHeadChunk1 + 0x0002,
-          1,
-          this.endianness
-        );
-        /**
-         * @type {Metadata}
-         */
-        const metadata = {
-          fileSize: getSliceAsNumber(this.rawData, 8, 4, this.endianness),
-          endianness: this.endianness,
-          codec: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1,
-            1,
-            this.endianness
-          ),
-          loopFlag: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x0001,
-            1,
-            this.endianness
-          ),
-          numberChannels,
-          sampleRate: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x0004,
-            2,
-            this.endianness
-          ),
-          loopStartSample: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x0008,
-            4,
-            this.endianness
-          ),
-          totalSamples: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x000c,
-            4,
-            this.endianness
-          ),
-          totalBlocks: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x0014,
-            4,
-            this.endianness
-          ),
-          blockSize: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x0018,
-            4,
-            this.endianness
-          ),
-          samplesPerBlock: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x001c,
-            4,
-            this.endianness
-          ),
-          finalBlockSize: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x0020,
-            4,
-            this.endianness
-          ),
-          finalBlockSizeWithPadding: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x0028,
-            4,
-            this.endianness
-          ),
-          totalSamplesInFinalBlock: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x0024,
-            4,
-            this.endianness
-          ),
-          adpcTableSamplesPerEntry: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x002c,
-            4,
-            this.endianness
-          ),
-          adpcTableBytesPerEntry: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk1 + 0x0030,
-            4,
-            this.endianness
-          ),
-          numberTracks: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk2,
-            1,
-            this.endianness
-          ),
-          trackDescriptionType: getSliceAsNumber(
-            this.rawData,
-            this._offsetToHeadChunk2 + 0x01,
-            1,
-            this.endianness
-          ),
-        };
-
-        return metadata;
-      }
-
-      /**
-       * Read only one block
-       * @param {number} block block index
-       * @returns {Array<Uint8Array>} array of non-interlaced raw data; each array represents one channel
-       */
-      _getPartitionedBlockData(block) {
-        const {
-          blockSize,
-          totalBlocks,
-          numberChannels,
-          finalBlockSize,
-          finalBlockSizeWithPadding,
-        } = this.metadata;
-
-        const result = [];
-        for (let c = 0; c < numberChannels; c++) {
-          result.push(
-            new Uint8Array(block === totalBlocks - 1 ? finalBlockSize : blockSize)
-          );
-        }
-
-        let b = block;
-        for (let c = 0; c < numberChannels; c++) {
-          const rawDataOffset =
-            // Final block on non-zero channel: need to consider the previous channels' finalBlockSizeWithPadding!
-            c !== 0 && b + 1 === totalBlocks
-              ? b * numberChannels * blockSize + c * finalBlockSizeWithPadding
-              : (b * numberChannels + c) * blockSize;
-          const rawDataEnd =
-            b + 1 === totalBlocks
-              ? rawDataOffset + finalBlockSize
-              : rawDataOffset + blockSize;
-
-          const slice = this.rawData.slice(
-            this._offsetToData + 0x20 + rawDataOffset,
-            this._offsetToData + 0x20 + rawDataEnd
-          );
-          result[c].set(slice);
-        }
-        return result;
-      }
-
-      /**
-       * @return {Array<Array<{yn1: number, yn2: number}>>}
-       */
-      _getPartitionedAdpcChunkData() {
-        if (this._partitionedAdpcChunkData) {
-          return this._partitionedAdpcChunkData;
-        }
-        const { totalBlocks, numberChannels } = this.metadata;
-        const adpcDataSize = getSliceAsNumber(
-          this.rawData,
-          this._offsetToAdpc + 0x04,
-          4,
-          this.endianness
-        );
-
-        // `rawData` here is adpc chunk's raw data
-        const rawData = this.rawData.slice(
-          this._offsetToAdpc + 0x08,
-          this._offsetToAdpc + 0x08 + adpcDataSize
-        );
-
-        let offset = 0;
-        let yn1 = 0;
-        let yn2 = 0;
-        for (let c = 0; c < numberChannels; c++) {
-          yn1 = getInt16(getSliceAsNumber(rawData, offset, 2, this.endianness));
-          offset += 2;
-          yn2 = getInt16(getSliceAsNumber(rawData, offset, 2, this.endianness));
-          offset += 2;
-        }
-
-        /**
-         * `transposedResult[b][c]`
-         *
-         * @type {Array<Array<{yn1: number, yn2: number}>>}
-         */
-        const transposedResult = [];
-        for (let b = 0; b < totalBlocks; b++) {
-          transposedResult.push([]);
-          for (let c = 0; c < numberChannels; c++) {
-            if (b > 0) {
-              yn1 = getInt16(getSliceAsNumber(rawData, offset, 2, this.endianness));
-              offset += 2;
-              yn2 = getInt16(getSliceAsNumber(rawData, offset, 2, this.endianness));
-              offset += 2;
-            }
-            transposedResult[b].push({
-              yn1,
-              yn2,
-            });
-          }
-        }
-
-        /**
-         * `result[c][b]`
-         *
-         * @type {Array<Array<{yn1: number, yn2: number}>>}
-         */
-        let result = [];
-        for (let c = 0; c < numberChannels; c++) {
-          result.push(
-            transposedResult.map((r) => {
-              return r[c];
-            })
-          );
-        }
-
-        this._partitionedAdpcChunkData = result;
-        return result;
-      }
-
-      /**
-       *
-       * @returns {Array<Int16Array>} per-channel samples
-       */
-      getAllSamples() {
-        if (this._cachedSamples) {
-          return this._cachedSamples;
-        }
-
-        const {
-          numberChannels,
-          totalSamples,
-          totalBlocks,
-          samplesPerBlock,
-        } = this.metadata;
-        const result = [];
-        for (let c = 0; c < numberChannels; c++) {
-          result.push(new Int16Array(totalSamples));
-        }
-        for (let b = 0; b < totalBlocks; b++) {
-          const sampleResult = this._getSamplesAtBlock(b);
-          for (let c = 0; c < numberChannels; c++) {
-            result[c].set(sampleResult[c], b * samplesPerBlock);
-          }
-        }
-
-        this._cachedSamples = result;
-
-        return result;
-      }
-
-      /**
-       *
-       * @param {number} b blockIndex
-       * @returns {Array<Int16Array>} per-channel samples in block `b`
-       */
-      _getSamplesAtBlock(b) {
-        if (this._cachedBlockResults[b]) {
-          return this._cachedBlockResults[b];
-        }
-
-        const {
-          numberChannels,
-          totalBlocks,
-          totalSamplesInFinalBlock,
-          samplesPerBlock,
-          codec,
-        } = this.metadata;
-        const channelInfo = this._getChannelInfo();
-        const allChannelsBlockData = this._getPartitionedBlockData(b);
-        const adpcChunkData = this._getPartitionedAdpcChunkData();
-
-        const result = [];
-        const totalSamplesInBlock =
-          b === totalBlocks - 1 ? totalSamplesInFinalBlock : samplesPerBlock;
-
-        for (let c = 0; c < numberChannels; c++) {
-          result.push(new Int16Array(totalSamplesInBlock));
-        }
-
-        for (let c = 0; c < numberChannels; c++) {
-          const { adpcmCoefficients } = channelInfo[c];
-          const blockData = allChannelsBlockData[c];
-
-          /**
-           * @type {Array<number>}
-           */
-          const sampleResult = [];
-          if (codec === 2) {
-            // 4-bit ADPCM
-            const ps = blockData[0];
-            const { yn1, yn2 } = adpcChunkData[c][b];
-
-            // #region Magic adapted from brawllib's ADPCMState.cs
-            let cps = ps,
-              cyn1 = yn1,
-              cyn2 = yn2,
-              dataIndex = 0;
-
-            for (let sampleIndex = 0; sampleIndex < totalSamplesInBlock; ) {
-              let outSample = 0;
-              if (sampleIndex % 14 === 0) {
-                cps = blockData[dataIndex++];
-              }
-              if ((sampleIndex++ & 1) === 0) {
-                outSample = blockData[dataIndex] >> 4;
-              } else {
-                outSample = blockData[dataIndex++] & 0x0f;
-              }
-              if (outSample >= 8) {
-                outSample -= 16;
-              }
-              const scale = 1 << (cps & 0x0f);
-              const cIndex = (cps >> 4) << 1;
-
-              outSample =
-                (0x400 +
-                  ((scale * outSample) << 11) +
-                  adpcmCoefficients[clamp(cIndex, 0, 15)] * cyn1 +
-                  adpcmCoefficients[clamp(cIndex + 1, 0, 15)] * cyn2) >>
-                11;
-
-              cyn2 = cyn1;
-              cyn1 = clamp(outSample, -32768, 32767);
-
-              sampleResult.push(cyn1);
-            }
-
-            // Overwrite history samples for the next block with decoded samples
-            if (b < totalBlocks - 1) {
-              adpcChunkData[c][b + 1].yn1 = sampleResult[totalSamplesInBlock - 1];
-              adpcChunkData[c][b + 1].yn2 = sampleResult[totalSamplesInBlock - 2];
-            }
-
-            // #endregion
-            // console.log('>>', c, b, yn1, yn2, ps, blockData, sampleResult);
-          } else if (codec === 1) {
-            // 16-bit PCM
-            for (
-              let sampleIndex = 0;
-              sampleIndex < totalSamplesInBlock;
-              sampleIndex++
-            ) {
-              const result = getInt16(
-                getSliceAsNumber(blockData, sampleIndex * 2, 2, this.endianness)
-              );
-              sampleResult.push(result);
-            }
-          } else if (codec === 0) {
-            // 8-bit PCM
-            for (
-              let sampleIndex = 0;
-              sampleIndex < totalSamplesInBlock;
-              sampleIndex++
-            ) {
-              sampleResult.push(getInt16(blockData[sampleIndex]));
-            }
-          } else {
-            throw new Error('Invalid codec');
-          }
-
-          result[c].set(sampleResult);
-        }
-
-        this._cachedBlockResults[b] = result;
-
-        return result;
-      }
-
-      /**
-       * Same as `getSamples`
-       *
-       * @deprecated Please use `getSamples`
-       *
-       * @param {number} offset
-       * @param {number} size
-       * @returns {Array<Int16Array>} per-channel samples from `offset`-th sample until `(offset + size - 1)`-th sample
-       */
-      getBuffer(offset, size) {
-        return this.getSamples(offset, size);
-      }
-
-      /**
-       * Get buffer of Int16 samples
-       *
-       *
-       * Make sure to not ask for anything outside the file!
-       *
-       * Example:
-       * - Total samples: 10000
-       * - brstm.getSamples(8000, 4000); is invalid
-       *
-       * @param {number} offset
-       * @param {number} size
-       * @returns {Array<Int16Array>} per-channel samples from `offset`-th sample until `(offset + size - 1)`-th sample
-       */
-      getSamples(offset, size) {
-        const {
-          numberChannels,
-          totalBlocks,
-          totalSamples,
-          samplesPerBlock,
-        } = this.metadata;
-
-        const sampleStart = Math.max(0, offset);
-        const sampleEnd = Math.min(totalSamples, offset + size);
-        const blockIndexStart = Math.max(
-          0,
-          Math.floor(sampleStart / samplesPerBlock)
-        );
-        const blockIndexEnd = Math.min(
-          totalBlocks - 1,
-          Math.floor(sampleEnd / samplesPerBlock)
-        );
-        const result = [];
-        for (let b = blockIndexStart; b <= blockIndexEnd; b++) {
-          result.push(this._getSamplesAtBlock(b));
-        }
-        /**
-         * @type {Array<Int16Array>}
-         */
-        const transformedResult = [];
-        for (let c = 0; c < numberChannels; c++) {
-          transformedResult.push(new Int16Array(sampleEnd - sampleStart));
-        }
-
-        for (let b = blockIndexStart; b <= blockIndexEnd; b++) {
-          const resulBlockIndex = b - blockIndexStart;
-          if (b === blockIndexStart && b === blockIndexEnd) {
-            // Slice `result[b][c]` so it starts at `offset` AND ends at `offset + size - 1`
-            for (let c = 0; c < numberChannels; c++) {
-              transformedResult[c].set(
-                result[resulBlockIndex][c].slice(
-                  sampleStart - blockIndexStart * samplesPerBlock,
-                  sampleStart - blockIndexStart * samplesPerBlock + size
-                ),
-                0
-              );
-            }
-          } else if (b === blockIndexStart) {
-            // Slice `result[b][c]` so it starts at `offset`
-            for (let c = 0; c < numberChannels; c++) {
-              const slice = result[resulBlockIndex][c].slice(
-                sampleStart - blockIndexStart * samplesPerBlock
-              );
-              transformedResult[c].set(slice, 0);
-            }
-          } else if (b === blockIndexEnd) {
-            // Slice `result[b][c]` so it ends at the requested place (`offset + size - 1`)
-            for (let c = 0; c < numberChannels; c++) {
-              const slice = result[resulBlockIndex][c].slice(
-                0,
-                sampleEnd -
-                  result[resulBlockIndex][c].length -
-                  blockIndexStart * samplesPerBlock
-              );
-              // At the final block, the slice sometimes ends up too large
-              // This is to prevent transformedResult from being overflowed
-              if (
-                slice.length + (b * samplesPerBlock - sampleStart) >
-                transformedResult[c].length
-              ) {
-                transformedResult[c].set(
-                  slice.slice(0, size - (b * samplesPerBlock - sampleStart)),
-                  b * samplesPerBlock - sampleStart
-                );
-              } else {
-                transformedResult[c].set(slice, b * samplesPerBlock - sampleStart);
-              }
-            }
-          } else {
-            for (let c = 0; c < numberChannels; c++) {
-              transformedResult[c].set(
-                result[resulBlockIndex][c],
-                b * samplesPerBlock - sampleStart
-              );
-            }
-          }
-        }
-        return transformedResult;
-      }
-    }
-
-    var brstm$1 = /*#__PURE__*/Object.freeze({
-        __proto__: null,
-        Brstm: Brstm
+    var brstm$1 = createCommonjsModule(function (module, exports) {
+    var q=(r,t,s)=>{if(!t.has(r))throw TypeError("Cannot "+s)};var e=(r,t,s)=>(q(r,t,"read from private field"),s?s.call(r):t.get(r)),S=(r,t,s)=>{if(t.has(r))throw TypeError("Cannot add the same private member more than once");t instanceof WeakSet?t.add(r):t.set(r,s);},B=(r,t,s,h)=>(q(r,t,"write to private field"),h?h.call(r,s):t.set(r,s),s);var C=(r,t,s)=>(q(r,t,"access private method"),s);Object.defineProperties(exports,{__esModule:{value:!0},[Symbol.toStringTag]:{value:"Module"}});function Q(r,t,s){const h=[];for(let i=t;i<t+s;i++)h.push(r[i]);return h}const R={LITTLE:0,BIG:1};function at(r){const t=Q(r,4,2);return t[0]===255&&t[1]===254?R.LITTLE:R.BIG}function nt(r,t,s,h=R.BIG){const i=Q(r,t,s);return h===R.LITTLE&&i.reverse(),String.fromCharCode(...i)}function a(r,t,s,h=R.BIG){const i=Q(r,t,s);return h===R.LITTLE&&i.reverse(),i.reduce((l,n)=>l*256+n,0)}function J(r,t,s){return r<=t?t:r>=s?s:r}function b(r){return r>=32768?r-65536:r}var T,w,g,z,A,L,E,P,M,x,F,Y,G,Z,N,$,O,tt,H,K;class it{constructor(t){S(this,F);S(this,G);S(this,N);S(this,O);S(this,H);S(this,T,void 0);S(this,w,void 0);S(this,g,void 0);S(this,z,void 0);S(this,A,void 0);S(this,L,void 0);S(this,E,void 0);S(this,P,void 0);S(this,M,void 0);S(this,x,void 0);if(B(this,E,null),B(this,P,null),B(this,M,null),B(this,x,[]),this.rawData=new Uint8Array(t),nt(this.rawData,0,4)!=="RSTM")throw new Error("Not a valid BRSTM file");this.endianness=at(this.rawData),B(this,T,a(this.rawData,16,4,this.endianness)),B(this,w,e(this,T)+a(this.rawData,e(this,T)+12,4,this.endianness)+8),B(this,g,e(this,T)+a(this.rawData,e(this,T)+20,4,this.endianness)+8),B(this,z,e(this,T)+a(this.rawData,e(this,T)+28,4,this.endianness)+8),B(this,A,a(this.rawData,24,4,this.endianness)),B(this,L,a(this.rawData,32,4,this.endianness)),this.metadata=C(this,G,Z).call(this);}getAllSamples(){if(e(this,E))return e(this,E);const{numberChannels:t,totalSamples:s,totalBlocks:h,samplesPerBlock:i}=this.metadata,l=[];for(let n=0;n<t;n++)l.push(new Int16Array(s));for(let n=0;n<h;n++){const d=C(this,H,K).call(this,n);for(let p=0;p<t;p++)l[p].set(d[p],n*i);}return B(this,E,l),l}getBuffer(t,s){return this.getSamples(t,s)}getSamples(t,s){const{numberChannels:h,totalBlocks:i,totalSamples:l,samplesPerBlock:n}=this.metadata,d=Math.max(0,t),p=Math.min(l,t+s),o=Math.max(0,Math.floor(d/n)),f=Math.min(i-1,Math.floor(p/n)),D=[];for(let m=o;m<=f;m++)D.push(C(this,H,K).call(this,m));const u=[];for(let m=0;m<h;m++)u.push(new Int16Array(p-d));for(let m=o;m<=f;m++){const I=m-o;if(m===o&&m===f)for(let c=0;c<h;c++)u[c].set(D[I][c].slice(d-o*n,d-o*n+s),0);else if(m===o)for(let c=0;c<h;c++){const k=D[I][c].slice(d-o*n);u[c].set(k,0);}else if(m===f)for(let c=0;c<h;c++){const k=D[I][c].slice(0,p-D[I][c].length-o*n);k.length+(m*n-d)>u[c].length?u[c].set(k.slice(0,s-(m*n-d)),m*n-d):u[c].set(k,m*n-d);}else for(let c=0;c<h;c++)u[c].set(D[I][c],m*n-d);}return u}}T=new WeakMap,w=new WeakMap,g=new WeakMap,z=new WeakMap,A=new WeakMap,L=new WeakMap,E=new WeakMap,P=new WeakMap,M=new WeakMap,x=new WeakMap,F=new WeakSet,Y=function(){if(e(this,M))return e(this,M);const{numberChannels:t}=this.metadata,s=[];for(let h=0;h<t;h++){const i=e(this,T)+a(this.rawData,e(this,z)+8+h*8,4,this.endianness)+8+8,l=[];for(let n=0;n<16;n++){const d=a(this.rawData,i+2*n,2,this.endianness);l.push(b(d));}s.push({adpcmCoefficients:l,gain:a(this.rawData,i+40,2,this.endianness),initialPredictorScale:a(this.rawData,i+42,2,this.endianness),historySample1:a(this.rawData,i+44,2,this.endianness),historySample2:a(this.rawData,i+46,2,this.endianness),loopPredictorScale:a(this.rawData,i+48,2,this.endianness),loopHistorySample1:a(this.rawData,i+50,2,this.endianness),loopHistorySample2:a(this.rawData,i+52,2,this.endianness)});}return B(this,M,s),s},G=new WeakSet,Z=function(){const t=a(this.rawData,e(this,w)+2,1,this.endianness),s=a(this.rawData,e(this,g),1,this.endianness),h=a(this.rawData,e(this,g)+1,1,this.endianness),i=[];for(let n=0;n<s;n++){const d=e(this,T)+8+a(this.rawData,e(this,g)+4+n*8+4,4,this.endianness),p=a(this.rawData,e(this,g)+4+n*8+1,1,this.endianness);let o=0;p===0?o=a(this.rawData,d,1,this.endianness):p===1&&(o=a(this.rawData,d+8,1,this.endianness)),i.push({numberChannels:o,type:p});}const l={fileSize:a(this.rawData,8,4,this.endianness),endianness:this.endianness,codec:a(this.rawData,e(this,w),1,this.endianness),loopFlag:a(this.rawData,e(this,w)+1,1,this.endianness),numberChannels:t,sampleRate:a(this.rawData,e(this,w)+4,2,this.endianness),loopStartSample:a(this.rawData,e(this,w)+8,4,this.endianness),totalSamples:a(this.rawData,e(this,w)+12,4,this.endianness),totalBlocks:a(this.rawData,e(this,w)+20,4,this.endianness),blockSize:a(this.rawData,e(this,w)+24,4,this.endianness),samplesPerBlock:a(this.rawData,e(this,w)+28,4,this.endianness),finalBlockSize:a(this.rawData,e(this,w)+32,4,this.endianness),finalBlockSizeWithPadding:a(this.rawData,e(this,w)+40,4,this.endianness),totalSamplesInFinalBlock:a(this.rawData,e(this,w)+36,4,this.endianness),adpcTableSamplesPerEntry:a(this.rawData,e(this,w)+44,4,this.endianness),adpcTableBytesPerEntry:a(this.rawData,e(this,w)+48,4,this.endianness),numberTracks:s,trackDescriptionType:h,trackDescriptions:i};return l.loopStartSample>=l.totalSamples&&(l.loopFlag=0,l.loopStartSample=0,console.warn("The loop start sample in this file is invalid.")),l},N=new WeakSet,$=function(t){const{blockSize:s,totalBlocks:h,numberChannels:i,finalBlockSize:l,finalBlockSizeWithPadding:n}=this.metadata,d=[];for(let o=0;o<i;o++)d.push(new Uint8Array(t===h-1?l:s));let p=t;for(let o=0;o<i;o++){const f=o!==0&&p+1===h?p*i*s+o*n:(p*i+o)*s,D=p+1===h?f+l:f+s,u=this.rawData.slice(e(this,L)+32+f,e(this,L)+32+D);d[o].set(u);}return d},O=new WeakSet,tt=function(){if(e(this,P))return e(this,P);const{totalBlocks:t,numberChannels:s}=this.metadata,h=a(this.rawData,e(this,A)+4,4,this.endianness),i=this.rawData.slice(e(this,A)+8,e(this,A)+8+h);let l=0,n=0,d=0;for(let f=0;f<s;f++)n=b(a(i,l,2,this.endianness)),l+=2,d=b(a(i,l,2,this.endianness)),l+=2;const p=[];for(let f=0;f<t;f++){p.push([]);for(let D=0;D<s;D++)f>0&&(n=b(a(i,l,2,this.endianness)),l+=2,d=b(a(i,l,2,this.endianness)),l+=2),p[f].push({yn1:n,yn2:d});}let o=[];for(let f=0;f<s;f++)o.push(p.map(D=>D[f]));return B(this,P,o),o},H=new WeakSet,K=function(t){if(e(this,x)[t])return e(this,x)[t];const{numberChannels:s,totalBlocks:h,totalSamplesInFinalBlock:i,samplesPerBlock:l,codec:n}=this.metadata,d=C(this,F,Y).call(this),p=C(this,N,$).call(this,t),o=C(this,O,tt).call(this),f=[],D=t===h-1?i:l;for(let u=0;u<s;u++)f.push(new Int16Array(D));for(let u=0;u<s;u++){const{adpcmCoefficients:m}=d[u],I=p[u],c=[];if(n===2){const k=I[0],{yn1:U,yn2:st}=o[u][t];let W=k,v=U,V=st,_=0;for(let j=0;j<D;){let y=0;j%14===0&&(W=I[_++]),(j++&1)===0?y=I[_]>>4:y=I[_++]&15,y>=8&&(y-=16);const et=1<<(W&15),X=W>>4<<1;y=1024+(et*y<<11)+m[J(X,0,15)]*v+m[J(X+1,0,15)]*V>>11,V=v,v=J(y,-32768,32767),c.push(v);}t<h-1&&(o[u][t+1].yn1=c[D-1],o[u][t+1].yn2=c[D-2]);}else if(n===1)for(let k=0;k<D;k++){const U=b(a(I,k*2,2,this.endianness));c.push(U);}else if(n===0)for(let k=0;k<D;k++)c.push(b(I[k])*256);else throw new Error("Invalid codec");f[u].set(c);}return e(this,x)[t]=f,f};exports.Brstm=it;
     });
 
     var STREAMING_MIN_RESPONSE$1 = 2**19;
@@ -979,26 +140,6 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
             outputBuffer[i] = buf[i];
         }
     };
-
-    function getAugmentedNamespace(n) {
-    	if (n.__esModule) return n;
-    	var a = Object.defineProperty({}, '__esModule', {value: true});
-    	Object.keys(n).forEach(function (k) {
-    		var d = Object.getOwnPropertyDescriptor(n, k);
-    		Object.defineProperty(a, k, d.get ? d : {
-    			enumerable: true,
-    			get: function () {
-    				return n[k];
-    			}
-    		});
-    	});
-    	return a;
-    }
-
-    function createCommonjsModule(fn) {
-      var module = { exports: {} };
-    	return fn(module, module.exports), module.exports;
-    }
 
     let currentlyGesturing = false;
     let activeArea = "";
@@ -1389,7 +530,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
     };
     });
 
-    var libbrstm = /*@__PURE__*/getAugmentedNamespace(brstm$1);
+    var libbrstm = brstm$1;
 
     //JavaScript Audio Resampler
     //Copyright (C) 2011-2015 Grant Galitz
@@ -1570,426 +711,496 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 
 
     const { STREAMING_MIN_RESPONSE } = configProvider;
-    const sleep = timeout => new Promise(resolve => setTimeout(resolve, timeout));
+    const sleep = (timeout) =>
+      new Promise((resolve) => setTimeout(resolve, timeout));
 
     function partitionedGetSamples(brstm, start, size) {
-        let samples = [];
-        let got = 0;
-        for (let i = 0; i < brstm.metadata.numberChannels; i++) {
-            samples.push(new Int16Array(size));
-        }
+      let samples = [];
+      let got = 0;
+      for (let i = 0; i < brstm.metadata.numberChannels; i++) {
+        samples.push(new Int16Array(size));
+      }
 
-        while (got < size) {
-            let buf = brstm.getSamples(start + got, Math.min(brstm.metadata.samplesPerBlock, (size - got)));
-            for (let i = 0; i < buf.length; i++) {
-                samples[i].set(buf[i], got);
-            }
-            got += Math.min(brstm.metadata.samplesPerBlock, (size - got));
+      while (got < size) {
+        let buf = brstm.getSamples(
+          start + got,
+          Math.min(brstm.metadata.samplesPerBlock, size - got)
+        );
+        for (let i = 0; i < buf.length; i++) {
+          samples[i].set(buf[i], got);
         }
+        got += Math.min(brstm.metadata.samplesPerBlock, size - got);
+      }
 
-        return samples;
+      return samples;
     }
 
     // Player state variables
-    let hasInitialized = false;    // If we measured browser capabilities yet
-    let capabilities = null;       // Capabilities of our browser
-    let audioContext = null;       // WebAudio Audio context
-    let scriptNode = null;         // WebAudio script node
-    let gainNode = null;           // WebAudio gain node
-    let fullyLoaded = true;        // Set to false if file is still streaming
-    let loadState = 0;             // How many bytes we loaded
+    let hasInitialized = false; // If we measured browser capabilities yet
+    let capabilities = null; // Capabilities of our browser
+    let audioContext = null; // WebAudio Audio context
+    let scriptNode = null; // WebAudio script node
+    let gainNode = null; // WebAudio gain node
+    let fullyLoaded = true; // Set to false if file is still streaming
+    let loadState = 0; // How many bytes we loaded
     let playbackCurrentSample = 0; // Current sample of playback (in the LibBRSTM)
-    let brstm = null;              // Instance of LibBRSTM
-    let brstmBuffer = null;        // Memory view shared with LibBRSTM
+    let brstm = null; // Instance of LibBRSTM
+    let brstmBuffer = null; // Memory view shared with LibBRSTM
     let paused = false;
     let enableLoop = false;
     let streamCancel = false;
     let playAudioRunning = false;
 
-    let samplesReady = 0;          // How many samples the streamer loaded
-    let volume = (localStorage.getItem("volumeoverride") || 1);
-    function guiupd() { gui.updateState({position: playbackCurrentSample, paused, volume, loaded: samplesReady, looping: enableLoop}); }
+    let samplesReady = 0; // How many samples the streamer loaded
+    let volume = localStorage.getItem("volumeoverride") || 1;
+    function guiupd() {
+      gui.updateState({
+        position: playbackCurrentSample,
+        paused,
+        volume,
+        loaded: samplesReady,
+        looping: enableLoop,
+      });
+    }
     function getResampledSample(sourceSr, targetSr, sample) {
-        return Math.ceil((sample / sourceSr) * targetSr);
+      return Math.ceil((sample / sourceSr) * targetSr);
     }
 
-    async function loadSongLegacy(url) { // Old song loading logic
-        let resp = await fetch(url);
-        let body = await resp.arrayBuffer(); // Fetch whole song
+    async function loadSongLegacy(url) {
+      // Old song loading logic
+      let resp = await fetch(url);
+      let body = await resp.arrayBuffer(); // Fetch whole song
 
-        brstm = new libbrstm.Brstm(body); // Initialize libBRSTM into global state
+      brstm = new libbrstm.Brstm(body); // Initialize libBRSTM into global state
 
-        fullyLoaded = true;
-        loadState = Number.MAX_SAFE_INTEGER; // This is legacy loading logic, we can just assume we downloaded everything
-        samplesReady = Number.MAX_SAFE_INTEGER;
+      fullyLoaded = true;
+      loadState = Number.MAX_SAFE_INTEGER; // This is legacy loading logic, we can just assume we downloaded everything
+      samplesReady = Number.MAX_SAFE_INTEGER;
     }
 
     function awaitMessage(content) {
-        return new Promise(function(resolve) {
-            function handler(c) {
-                if (c.data === content && c.isTrusted) {
-                    window.removeEventListener("message", handler);
-                    resolve();
-                }
-            }
+      return new Promise(function (resolve) {
+        function handler(c) {
+          if (c.data === content && c.isTrusted) {
+            window.removeEventListener("message", handler);
+            resolve();
+          }
+        }
 
-            window.addEventListener("message", handler);
-        });
+        window.addEventListener("message", handler);
+      });
     }
 
-    function loadSongStreaming(url) { // New, fancy song loading logic
-        return new Promise(async (resolve, reject) => {
-            let resp;
-            let reader;
-            try {
-                resp = await fetch(url);
-                reader = (await resp.body).getReader(); // Initialize reader
-            } catch(e) { return reject(e); }
-            brstmBuffer = new ArrayBuffer(parseInt(resp.headers.get("content-length")));
-            let bufferView = new Uint8Array(brstmBuffer); // Create shared memory view
-            let writeOffset = 0; // How much we read
-            let resolved = false; // Did we resolve the promise already
-            let brstmHeaderSize = 0;
-            samplesReady = 0;
-            fullyLoaded = false; // We are now streaming
-            streamCancel = false;
-            while(true) {
-                let d;
-                try {
-                    d = await reader.read(); // Read next chunk
-                } catch(e) {
-                    if (resolved) {
-                        gui.updateState({streamingDied: true, buffering: false, ready:true});
-                        await audioContext.close();
-                        audioContext = null;
-                    } else {
-                        reject(e);
-                    }
-                    return;
-                }
-                if (streamCancel) {
-                    await reader.cancel();
-                    window.postMessage("continueload");
-                    return;
-                }
-                if (!d.done) { // This means we will receive more
-                    bufferView.set(d.value, writeOffset);
-                    writeOffset += d.value.length;
-                    loadState = writeOffset;
-
-                    // Read the file's header size from the file before passing the file to the BRSTM reader.
-                    if (brstmHeaderSize == 0 && writeOffset > 0x80) {
-                        // Byte order. 0 = LE, 1 = BE.
-                        let endian = 0;
-                        // Read byte order mark. 0x04
-                        let bom = (bufferView[0x04]*256 + bufferView[0x05]);
-                        if (bom == 0xFEFF) {
-                            endian = 1;
-                        }
-
-                        // Read the audio offset. 0x70
-                        if(endian == 1) {
-                            brstmHeaderSize = (bufferView[0x70]*16777216 + bufferView[0x71]*65536 + bufferView[0x72]*256 + bufferView[0x73]);
-                        } else {
-                            brstmHeaderSize = (bufferView[0x70] + bufferView[0x71]*256 + bufferView[0x72]*65536 + bufferView[0x73]*16777216);
-                        }
-                        // If the offset in the file turned out to be 0 for some reason or seems to small,
-                        // then fall back to the default minimum size, though the file is very likely to be invalid in this case.
-                        if(brstmHeaderSize < 0x90) {
-                            brstmHeaderSize = STREAMING_MIN_RESPONSE;
-                        }
-                    }
-
-                    if (!resolved && brstmHeaderSize != 0 && writeOffset > brstmHeaderSize) {
-                        // Initialize BRSTM instance and allow player to continue loading
-                        try {
-                            brstm = new libbrstm.Brstm(brstmBuffer);
-                            resolve();
-                            resolved = true;
-                        } catch(e) {
-                            reject(e);
-                            return;
-                        }
-
-                    }
-                    if (resolved) {
-                        samplesReady = Math.floor(
-                            ((loadState - brstmHeaderSize) / brstm.metadata.numberChannels) / brstm.metadata.blockSize
-                        ) * brstm.metadata.samplesPerBlock;
-                    }
-                } else {
-                    if (!resolved) {
-                        // For some reason we haven't resolved yet despite the file finishing
-                        try {
-                            brstm = new libbrstm.Brstm(brstmBuffer);
-                            resolve();
-                            resolved = true;
-                        } catch(e) {
-                            reject(e);
-                            return;
-                        }
-                    }
-                    fullyLoaded = true;
-                    samplesReady = Number.MAX_SAFE_INTEGER; // Just in case
-                    console.log("File finished streaming");
-                    break;
-                }
+    function loadSongStreaming(url) {
+      // New, fancy song loading logic
+      return new Promise(async (resolve, reject) => {
+        let resp;
+        let reader;
+        try {
+          resp = await fetch(url);
+          reader = (await resp.body).getReader(); // Initialize reader
+        } catch (e) {
+          return reject(e);
+        }
+        brstmBuffer = new ArrayBuffer(parseInt(resp.headers.get("content-length")));
+        let bufferView = new Uint8Array(brstmBuffer); // Create shared memory view
+        let writeOffset = 0; // How much we read
+        let resolved = false; // Did we resolve the promise already
+        let brstmHeaderSize = 0;
+        samplesReady = 0;
+        fullyLoaded = false; // We are now streaming
+        streamCancel = false;
+        while (true) {
+          let d;
+          try {
+            d = await reader.read(); // Read next chunk
+          } catch (e) {
+            if (resolved) {
+              gui.updateState({
+                streamingDied: true,
+                buffering: false,
+                ready: true,
+              });
+              await audioContext.close();
+              audioContext = null;
+            } else {
+              reject(e);
             }
-        });
+            return;
+          }
+          if (streamCancel) {
+            await reader.cancel();
+            window.postMessage("continueload");
+            return;
+          }
+          if (!d.done) {
+            // This means we will receive more
+            bufferView.set(d.value, writeOffset);
+            writeOffset += d.value.length;
+            loadState = writeOffset;
+
+            // Read the file's header size from the file before passing the file to the BRSTM reader.
+            if (brstmHeaderSize == 0 && writeOffset > 0x80) {
+              // Byte order. 0 = LE, 1 = BE.
+              let endian = 0;
+              // Read byte order mark. 0x04
+              let bom = bufferView[0x04] * 256 + bufferView[0x05];
+              if (bom == 0xfeff) {
+                endian = 1;
+              }
+
+              // Read the audio offset. 0x70
+              if (endian == 1) {
+                brstmHeaderSize =
+                  bufferView[0x70] * 16777216 +
+                  bufferView[0x71] * 65536 +
+                  bufferView[0x72] * 256 +
+                  bufferView[0x73];
+              } else {
+                brstmHeaderSize =
+                  bufferView[0x70] +
+                  bufferView[0x71] * 256 +
+                  bufferView[0x72] * 65536 +
+                  bufferView[0x73] * 16777216;
+              }
+              // If the offset in the file turned out to be 0 for some reason or seems to small,
+              // then fall back to the default minimum size, though the file is very likely to be invalid in this case.
+              if (brstmHeaderSize < 0x90) {
+                brstmHeaderSize = STREAMING_MIN_RESPONSE;
+              }
+            }
+
+            if (
+              !resolved &&
+              brstmHeaderSize != 0 &&
+              writeOffset > brstmHeaderSize
+            ) {
+              // Initialize BRSTM instance and allow player to continue loading
+              try {
+                brstm = new libbrstm.Brstm(brstmBuffer);
+                resolve();
+                resolved = true;
+              } catch (e) {
+                reject(e);
+                return;
+              }
+            }
+            if (resolved) {
+              samplesReady =
+                Math.floor(
+                  (loadState - brstmHeaderSize) /
+                    brstm.metadata.numberChannels /
+                    brstm.metadata.blockSize
+                ) * brstm.metadata.samplesPerBlock;
+            }
+          } else {
+            if (!resolved) {
+              // For some reason we haven't resolved yet despite the file finishing
+              try {
+                brstm = new libbrstm.Brstm(brstmBuffer);
+                resolve();
+                resolved = true;
+              } catch (e) {
+                reject(e);
+                return;
+              }
+            }
+            fullyLoaded = true;
+            samplesReady = Number.MAX_SAFE_INTEGER; // Just in case
+            console.log("File finished streaming");
+            break;
+          }
+        }
+      });
     }
 
     const internalApi = {
-        setVolume: function(l) {
-            volume=l;
-            guiupd();
-            if (gainNode)
-                gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-        },
-        seek: function(p) {
-            playbackCurrentSample = Math.floor(p);
-            guiupd();
-        },
-        pause: function() {
-            paused = !paused;
-            audioContext[paused ? "suspend" : "resume"]();
-            guiupd();
-        },
-        setLoop: function(a) {
-            enableLoop = a;
-            guiupd();
-        }
+      setVolume: function (l) {
+        volume = l;
+        guiupd();
+        if (gainNode)
+          gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+      },
+      seek: function (p) {
+        playbackCurrentSample = Math.floor(p);
+        guiupd();
+      },
+      pause: function () {
+        paused = !paused;
+        audioContext[paused ? "suspend" : "resume"]();
+        guiupd();
+      },
+      setLoop: function (a) {
+        enableLoop = a;
+        guiupd();
+      },
     };
 
-    async function startPlaying(url) { // Entry point to the
-        if (!hasInitialized) { // We haven't probed the browser for its capabilities yet
-            capabilities = await browserCapabilities();
-            hasInitialized = true;
-            gui.runGUI(internalApi);
-            setInterval(function() { gui.updateState({loaded:samplesReady}); gui.guiUpdate(); }, 100);
-        } // Now we have!
+    async function startPlaying(url) {
+      // Entry point to the
+      console.log(`playing ${url}`);
+      if (!hasInitialized) {
+        // We haven't probed the browser for its capabilities yet
+        capabilities = await browserCapabilities();
+        hasInitialized = true;
+        gui.runGUI(internalApi);
+        setInterval(function () {
+          gui.updateState({ loaded: samplesReady });
+          gui.guiUpdate();
+        }, 100);
+      } // Now we have!
 
-        if (playAudioRunning) return;
-        playAudioRunning = true;
-        if (!fullyLoaded) {
+      if (playAudioRunning) return;
+      playAudioRunning = true;
+      if (!fullyLoaded) {
+        console.log("Cancelling last stream...");
+        streamCancel = true;
+        await awaitMessage("continueload");
+        console.log("Done.");
+      }
+      if (audioContext) {
+        // We have a previous audio context, we need to murderize it
+        await audioContext.close();
+        audioContext = null;
+      }
 
-            console.log("Cancelling last stream...");
-            streamCancel = true;
-            await awaitMessage("continueload");
-            console.log("Done.");
-        }
-        if (audioContext) { // We have a previous audio context, we need to murderize it
-            await audioContext.close();
-            audioContext = null;
-        }
+      playbackCurrentSample = 0; // Set the state for playback
+      paused = false; // Unpause it
 
-        playbackCurrentSample = 0; // Set the state for playback
-        paused = false;            // Unpause it
+      gui.updateState({
+        // Populate GUI with initial, yet unknown data
+        ready: false,
+        position: 0,
+        samples: 1e6,
+        loaded: 0,
+        volume: volume,
+        paused: false,
+        buffering: false,
+        sampleRate: 44100,
+        streamingDied: false,
+      });
+      try {
+        await (capabilities.streaming ? loadSongStreaming : loadSongLegacy)(url); // Begin loading based on capabilities
+      } catch (e) {
+        gui.updateState({ streamingDied: true, ready: true, buffering: false });
+        console.error(e);
+        playAudioRunning = false;
+        return;
+      }
+      // The promise returned by the loading method is either resolved after the download is done (legacy)
+      // Or after we download enough to begin loading (modern)
 
-        gui.updateState({ // Populate GUI with initial, yet unknown data
-            ready: false,
-            position: 0,
-            samples: 1e6,
-            loaded: 0,
-            volume: volume,
-            paused: false,
-            buffering: false,
-            sampleRate: 44100,
-            streamingDied: false
-        });
-        try {
-            await (capabilities.streaming ? loadSongStreaming : loadSongLegacy)(url); // Begin loading based on capabilities
-        } catch(e) {
-            gui.updateState({streamingDied:true, ready:true, buffering: false});
-            console.error(e);
-            playAudioRunning = false;
-            return;
-        }
-            // The promise returned by the loading method is either resolved after the download is done (legacy)
-            // Or after we download enough to begin loading (modern)
+      audioContext = new (window.AudioContext || window.webkitAudioContext)( // Because Safari is retarded
+        capabilities.sampleRate ? { sampleRate: brstm.metadata.sampleRate } : {}
+      ); // Do we support sampling?
+      // If not, we just let the browser pick
 
-        audioContext = new (window.AudioContext || window.webkitAudioContext) // Because Safari is retarded
-            (capabilities.sampleRate ? {sampleRate: brstm.metadata.sampleRate} : {
-            }); // Do we support sampling?
-        // If not, we just let the browser pick
+      enableLoop = brstm.metadata.loopFlag === 1; // Set the loop settings respective to the loop flag in brstm file
 
-        enableLoop = (brstm.metadata.loopFlag === 1); // Set the loop settings respective to the loop flag in brstm file
+      await webAudioUnlock(audioContext); // Request unlocking of the audio context
 
-        await webAudioUnlock(audioContext); // Request unlocking of the audio context
+      if (capabilities.streaming) {
+        await sleep(1000); // In streaming sometimes the start is slightly crunchy, this should fix it.
+      }
 
-        if (capabilities.streaming) {
-            await sleep(1000); // In streaming sometimes the start is slightly crunchy, this should fix it.
-        }
+      // Create the script node
+      scriptNode = audioContext.createScriptProcessor(0, 0, 2);
 
-        // Create the script node
-        scriptNode = audioContext.createScriptProcessor(0, 0, 2);
+      // Process bufferSize
+      let bufferSize = scriptNode.bufferSize;
 
-        // Process bufferSize
-        let bufferSize = scriptNode.bufferSize;
-        
-        // If we have to resample, the buffer that we get from the BRSTM will be different size.
-        bufferSize = capabilities.sampleRate ? bufferSize : getResampledSample(
+      // If we have to resample, the buffer that we get from the BRSTM will be different size.
+      bufferSize = capabilities.sampleRate
+        ? bufferSize
+        : getResampledSample(
             audioContext.sampleRate,
             brstm.metadata.sampleRate,
             bufferSize
-        );
-        let loadBufferSize = bufferSize;
-        
-        // If we resample, we need to also fetch some extra samples to prevent audio glitches
-        if (!capabilities.sampleRate) {
-            loadBufferSize += 20;
+          );
+      let loadBufferSize = bufferSize;
+
+      // If we resample, we need to also fetch some extra samples to prevent audio glitches
+      if (!capabilities.sampleRate) {
+        loadBufferSize += 20;
+      }
+
+      gui.updateState({ ready: true, samples: brstm.metadata.totalSamples });
+      gui.updateState({ sampleRate: brstm.metadata.sampleRate });
+      playAudioRunning = false;
+      // Set the audio loop callback (called by the browser every time the internal buffer expires)
+      scriptNode.onaudioprocess = function (audioProcessingEvent) {
+        guiupd();
+        // Get a handle for the audio buffer
+        let outputBuffer = audioProcessingEvent.outputBuffer;
+        if (!outputBuffer.copyToChannel)
+          // On safari (Because it's retarded), we have to polyfill this
+          outputBuffer.copyToChannel = copyToChannelPolyfill;
+
+        // Not enough samples override
+        if (playbackCurrentSample + bufferSize + 1024 > samplesReady) {
+          // override, return early.
+          gui.updateState({ buffering: true });
+          console.log("Buffering....");
+          outputBuffer.copyToChannel(
+            new Float32Array(scriptNode.bufferSize).fill(0),
+            0
+          );
+          outputBuffer.copyToChannel(
+            new Float32Array(scriptNode.bufferSize).fill(0),
+            1
+          );
+          return;
+        }
+        gui.updateState({ buffering: false });
+        if (paused) {
+          // If we are paused, we just bail out and return with just zeros
+          outputBuffer.copyToChannel(
+            new Float32Array(scriptNode.bufferSize).fill(0),
+            0
+          );
+          outputBuffer.copyToChannel(
+            new Float32Array(scriptNode.bufferSize).fill(0),
+            1
+          );
+          return;
         }
 
-        gui.updateState({ready: true, samples: brstm.metadata.totalSamples});
-        gui.updateState({sampleRate: brstm.metadata.sampleRate});
-        playAudioRunning = false;
-        // Set the audio loop callback (called by the browser every time the internal buffer expires)
-        scriptNode.onaudioprocess = function(audioProcessingEvent) {
-            guiupd();
-            // Get a handle for the audio buffer
-            let outputBuffer = audioProcessingEvent.outputBuffer;
-            if (!outputBuffer.copyToChannel) // On safari (Because it's retarded), we have to polyfill this
-                outputBuffer.copyToChannel = copyToChannelPolyfill;
+        let samples; // Declare the variable for samples
+        // This will be filled using the below code for handling looping
+        if (playbackCurrentSample + loadBufferSize < brstm.metadata.totalSamples) {
+          // Standard codepath if no loop
+          // Populate samples with enough that we can just play it (or resample + play it) without glitches
+          samples = partitionedGetSamples(
+            brstm,
+            playbackCurrentSample,
+            loadBufferSize
+          );
 
-            // Not enough samples override
-            if ((playbackCurrentSample + bufferSize + 1024) > samplesReady) {
-                // override, return early.
-                gui.updateState({buffering: true});
-                console.log("Buffering....");
-                outputBuffer.copyToChannel(new Float32Array(scriptNode.bufferSize).fill(0), 0);
-                outputBuffer.copyToChannel(new Float32Array(scriptNode.bufferSize).fill(0), 1);
-                return;
-            }
-            gui.updateState({buffering: false});
-            if (paused) { // If we are paused, we just bail out and return with just zeros
-                outputBuffer.copyToChannel(new Float32Array(scriptNode.bufferSize).fill(0), 0);
-                outputBuffer.copyToChannel(new Float32Array(scriptNode.bufferSize).fill(0), 1);
-                return;
-            }
+          // We use bufferSize not loadBufferSize because the last 20 samples if we have resampling are inaudible
+          playbackCurrentSample += bufferSize;
+        } else {
+          // We are reaching EOF
+          // Check if we have looping enabled
+          if (enableLoop) {
+            // First, get all the samples to the end of the file
+            samples = partitionedGetSamples(
+              brstm,
+              playbackCurrentSample,
+              brstm.metadata.totalSamples - playbackCurrentSample
+            );
 
-            let samples; // Declare the variable for samples
-                         // This will be filled using the below code for handling looping
-            if ((playbackCurrentSample + loadBufferSize) < brstm.metadata.totalSamples) { // Standard codepath if no loop
-                // Populate samples with enough that we can just play it (or resample + play it) without glitches
-                samples = partitionedGetSamples(
-                    brstm,
-                    playbackCurrentSample,
-                    loadBufferSize
-                );
+            let endSamplesLength = samples[0].length;
 
-                // We use bufferSize not loadBufferSize because the last 20 samples if we have resampling are inaudible
-                playbackCurrentSample += bufferSize;
-            } else {
-                // We are reaching EOF
-                // Check if we have looping enabled
-                if (enableLoop) {
-                    // First, get all the samples to the end of the file
-                    samples = partitionedGetSamples(
-                        brstm,
-                        playbackCurrentSample,
-                        (brstm.metadata.totalSamples - playbackCurrentSample)
-                    );
-                    
-                    let endSamplesLength = samples[0].length;
+            console.log(
+              brstm.metadata.totalSamples - playbackCurrentSample,
+              loadBufferSize - endSamplesLength
+            );
 
-                    console.log((brstm.metadata.totalSamples - playbackCurrentSample), (loadBufferSize - endSamplesLength));
+            // Get enough samples to fully populate the buffer AFTER loop start point
+            let postLoopSamples = partitionedGetSamples(
+              brstm,
+              brstm.metadata.loopStartSample,
+              loadBufferSize - endSamplesLength
+            );
 
-                    // Get enough samples to fully populate the buffer AFTER loop start point
-                    let postLoopSamples = partitionedGetSamples(
-                        brstm,
-                        brstm.metadata.loopStartSample,
-                        (loadBufferSize - endSamplesLength)
-                    );
-
-                    // For every channel, join the first and second buffers created above
-                    for (let i = 0; i < samples.length; i++) {
-                        let buf = new Int16Array(loadBufferSize).fill(0);
-                        buf.set(samples[i]);
-                        buf.set(postLoopSamples[i], samples[i].length);
-                        samples[i] = buf;
-                    }
-
-                    // Set to loopStartPoint + length of second buffer (recalculated to not set extra resampling samples)
-                    playbackCurrentSample = brstm.metadata.loopStartSample + bufferSize - endSamplesLength;
-                } else {
-                    // No looping
-                    // Get enough samples until EOF
-                    samples = partitionedGetSamples(
-                        brstm,
-                        playbackCurrentSample,
-                        (brstm.metadata.totalSamples - playbackCurrentSample - 1)
-                    );
-
-                    // Fill remaining space in the buffer with 0
-                    for (let i = 0; i < samples.length; i++) {
-                        let buf = new Int16Array(loadBufferSize).fill(0);
-                        buf.set(samples[i]);
-                        samples[i] = buf;
-                    }
-
-                    // Tell the player that on the next iteration we are at the start and paused
-                    playbackCurrentSample = 0;
-                    paused = true;
-                    setTimeout(function() { audioContext.suspend(); }, 200);
-                }
-            }
-
-            // In files with too many channels, we just play the first 2 channels
-            if (samples.length > 2) {
-                samples = [samples[0], samples[1]];
-            }
-
-            // In mono files, we duplicate the channel because stereo is mandatory
-            if (samples.length === 1) {
-                samples = [samples[0], samples[0]];
-            }
-
-            // Populate outputs for both channels
+            // For every channel, join the first and second buffers created above
             for (let i = 0; i < samples.length; i++) {
-                // WebAudio requires Float32 (-1 to 1), we have Int16 (-32768 to 32767)
-                let chan = new Float32Array(loadBufferSize);
-
-                // Convert to Float32
-                for (let sid = 0; sid < loadBufferSize; sid++) {
-                    chan[sid] = samples[i][sid] / 32768;
-                }
-
-                // If we require resampling
-                if (!capabilities.sampleRate) {
-                    // Initialize the resampler with the original data we got from BRSTM
-                    let zresampler = new Resampler(brstm.metadata.sampleRate, audioContext.sampleRate, 1, chan);
-
-                    // Resample all the samples we loaded
-                    zresampler.resampler(loadBufferSize);
-
-                    // Copy the output to the channel
-                    chan = zresampler.outputBuffer;
-
-                    // Cut off excess samples
-                    if (chan.length > scriptNode.bufferSize) {
-                        chan = chan.slice(0, scriptNode.bufferSize);
-                    }
-                }
-
-                // At last, write all samples to the output buffer
-                outputBuffer.copyToChannel(chan, i);
+              let buf = new Int16Array(loadBufferSize).fill(0);
+              buf.set(samples[i]);
+              buf.set(postLoopSamples[i], samples[i].length);
+              samples[i] = buf;
             }
-        };
 
-        // Gain node controls volume
-        gainNode = audioContext.createGain();
+            // Set to loopStartPoint + length of second buffer (recalculated to not set extra resampling samples)
+            playbackCurrentSample =
+              brstm.metadata.loopStartSample + bufferSize - endSamplesLength;
+          } else {
+            // No looping
+            // Get enough samples until EOF
+            samples = partitionedGetSamples(
+              brstm,
+              playbackCurrentSample,
+              brstm.metadata.totalSamples - playbackCurrentSample - 1
+            );
 
-        // Script node needs to pass through gain so it can be controlled
-        scriptNode.connect(gainNode);
+            // Fill remaining space in the buffer with 0
+            for (let i = 0; i < samples.length; i++) {
+              let buf = new Int16Array(loadBufferSize).fill(0);
+              buf.set(samples[i]);
+              samples[i] = buf;
+            }
 
-        // Gain node outputs to the actual speakers
-        gainNode.connect(audioContext.destination);
+            // Tell the player that on the next iteration we are at the start and paused
+            playbackCurrentSample = 0;
+            paused = true;
+            setTimeout(function () {
+              audioContext.suspend();
+            }, 200);
+          }
+        }
 
-        // Set gain node volume to `volumeoverride` for remembering the volume
-        gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+        // In files with too many channels, we just play the first 2 channels
+        if (samples.length > 2) {
+          samples = [samples[0], samples[1]];
+        }
+
+        // In mono files, we duplicate the channel because stereo is mandatory
+        if (samples.length === 1) {
+          samples = [samples[0], samples[0]];
+        }
+
+        // Populate outputs for both channels
+        for (let i = 0; i < samples.length; i++) {
+          // WebAudio requires Float32 (-1 to 1), we have Int16 (-32768 to 32767)
+          let chan = new Float32Array(loadBufferSize);
+
+          // Convert to Float32
+          for (let sid = 0; sid < loadBufferSize; sid++) {
+            chan[sid] = samples[i][sid] / 32768;
+          }
+
+          // If we require resampling
+          if (!capabilities.sampleRate) {
+            // Initialize the resampler with the original data we got from BRSTM
+            let zresampler = new Resampler(
+              brstm.metadata.sampleRate,
+              audioContext.sampleRate,
+              1,
+              chan
+            );
+
+            // Resample all the samples we loaded
+            zresampler.resampler(loadBufferSize);
+
+            // Copy the output to the channel
+            chan = zresampler.outputBuffer;
+
+            // Cut off excess samples
+            if (chan.length > scriptNode.bufferSize) {
+              chan = chan.slice(0, scriptNode.bufferSize);
+            }
+          }
+
+          // At last, write all samples to the output buffer
+          outputBuffer.copyToChannel(chan, i);
+        }
+      };
+
+      // Gain node controls volume
+      gainNode = audioContext.createGain();
+
+      // Script node needs to pass through gain so it can be controlled
+      scriptNode.connect(gainNode);
+
+      // Gain node outputs to the actual speakers
+      gainNode.connect(audioContext.destination);
+
+      // Set gain node volume to `volumeoverride` for remembering the volume
+      gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
     }
 
     window.player = {
-        play: startPlaying
+      play: startPlaying,
     };
 
-}());
+})();
