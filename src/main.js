@@ -1,12 +1,11 @@
 // This script shouldn't do anything without explicit user interaction (Triggering playback)
-
-const browserCapabilities = require("./browserCapabilities");
 const libbrstm = require("brstm");
 const gui = require("./gui");
 import { STREAMING_MIN_RESPONSE } from "./configProvider";
 import copyToChannelPolyfill from "./copyToChannelPolyfill";
 import resampler from "./resampler";
 import unlock from "./webAudioUnlock";
+import browserCapabilities from "./browserCapabilities";
 const sleep = (timeout) =>
   new Promise((resolve) => setTimeout(resolve, timeout));
 const powersOf2 = [256, 512, 1024, 2048, 4096, 8192, 16384, 32768];
