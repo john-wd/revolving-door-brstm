@@ -1,1 +1,0 @@
-module.exports.STREAMING_MIN_RESPONSE = 2**19;

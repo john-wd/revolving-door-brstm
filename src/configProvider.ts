@@ -1,0 +1,3 @@
+const STREAMING_MIN_RESPONSE = 2 ** 19;
+
+export { STREAMING_MIN_RESPONSE };
