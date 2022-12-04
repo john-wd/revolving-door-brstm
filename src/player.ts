@@ -45,6 +45,7 @@ interface State {
   enableLoop: boolean;
   streamCancel: boolean;
   playAudioRunning: boolean;
+  stopped: boolean;
   volume: number;
   samplesReady: number; // How many samples the streamer loaded
 }
@@ -63,6 +64,7 @@ export class BrstmPlayer {
       brstm: null,
       brstmBuffer: null,
       paused: false,
+      stopped: false,
       enableLoop: false,
       streamCancel: false,
       playAudioRunning: false,
@@ -237,10 +239,18 @@ export class BrstmPlayer {
         this._state.audioContext.currentTime
       );
   }
+  incVolume(step: number) {
+    this.setVolume(Math.min(this._state.volume + step, 1));
+  }
+  decVolume(step: number) {
+    this.setVolume(Math.max(this._state.volume - step, 0));
+  }
   seek(to: number) {
     this._state.playbackCurrentSample = Math.floor(to);
     this.guiupd();
   }
+  next() {}
+  previous() {}
   pause() {
     this._state.paused = !this._state.paused;
     this._state.audioContext[this._state.paused ? "suspend" : "resume"]();
@@ -250,9 +260,14 @@ export class BrstmPlayer {
     this._state.enableLoop = enable;
     this.guiupd();
   }
+  stop() {
+    this._state.stopped = true;
+    gui.destroyGui();
+  }
 
   async play(url: string) {
     // Entry point to the
+    this._state.stopped = false;
     gui.runGUI(this);
     console.log(`Playing ${url}`);
     if (!this._state.hasInitialized) {
@@ -354,6 +369,7 @@ export class BrstmPlayer {
     this._state.playAudioRunning = false;
     // Set the audio loop callback (called by the browser every time the internal buffer expires)
     this._state.scriptNode.onaudioprocess = (audioProcessingEvent) => {
+      if (this._state.stopped === true) return;
       this.guiupd();
       // Get a handle for the audio buffer
       let outputBuffer = audioProcessingEvent.outputBuffer;

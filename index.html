@@ -4,14 +4,41 @@
     <meta charset="UTF-8" />
     <title>Test</title>
     <link rel="stylesheet" href="player.css" />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
   </head>
   <body>
     Song id:<input type="number" min="0" max="99999" value="25772" id="aaa" />
-    <a
-      href="#"
-      onclick="window.player.play('https://smashcustommusic.net/brstm/' + document.querySelector('#aaa').value + '&noIncrement=1')"
-      >Play</a
-    >
+
+    <br />
+    <div>
+      <button
+        href="#"
+        onclick="window.player.play('https://smashcustommusic.net/brstm/' + document.querySelector('#aaa').value + '&noIncrement=1')"
+      >
+        <span class="material-icons">play_arrow</span>
+      </button>
+      <button onclick="window.player.pause()">
+        <span class="material-icons">pause</span>
+      </button>
+      <button onclick="window.player.stop()">
+        <span class="material-icons">stop</span>
+      </button>
+      <button onclick="window.player.previous()">
+        <span class="material-icons">skip_previous</span>
+      </button>
+      <button onclick="window.player.next()">
+        <span class="material-icons">skip_next</span>
+      </button>
+      <button onclick="window.player.decVolume(.1)">
+        <span class="material-icons">volume_down</span>
+      </button>
+      <button onclick="window.player.incVolume(.1)">
+        <span class="material-icons">volume_up</span>
+      </button>
+    </div>
     <script src="dist/bundle.min.js?version=202"></script>
     <script>
       if (window.location.hash.length > 1) {

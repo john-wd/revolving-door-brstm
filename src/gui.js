@@ -216,6 +216,12 @@ let lastLooping = null;
 let lastLoaded = -1;
 let lastStreamState = null;
 
+module.exports.destroyGui = function () {
+  if (guiElement) {
+    guiElement.remove();
+  }
+};
+
 module.exports.guiUpdate = function () {
   if (guiElement) {
     if (lastStreamState !== state.streamingDied) {
