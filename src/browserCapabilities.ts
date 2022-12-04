@@ -1,9 +1,9 @@
-interface Capabilities {
+export interface Capabilities {
   sampleRate: boolean;
   streaming: boolean;
 }
 
-export default async function (): Promise<Capabilities> {
+export async function browserCapabilities(): Promise<Capabilities> {
   let capabilities: Capabilities = {
     sampleRate: false,
     streaming: false,

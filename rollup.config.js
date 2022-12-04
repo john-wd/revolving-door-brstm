@@ -3,7 +3,7 @@ import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 
 export default {
-  input: "built/main.js",
+  input: "built/index.js",
   output: [
     {
       file: "dist/bundle.js",
