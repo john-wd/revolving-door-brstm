@@ -244,7 +244,6 @@
 	    Object.assign(state, newState);
 	};
 	module.exports.runGUI = function (a) {
-	    console.log(ge);
 	    api = a;
 	    // Creating GUI
 	    guiElement = document.createElement("div");
@@ -295,7 +294,7 @@
 	    document
 	        .querySelector("#pl-pause-play")
 	        .addEventListener("click", function () {
-	        api.pause();
+	        api.playPause();
 	        module.exports.guiUpdate();
 	    });
 	    document.querySelector("#pl-loop-box").addEventListener("input", function () {
@@ -730,6 +729,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	        let capabilities = {
 	            sampleRate: false,
 	            streaming: false,
+	            mediaSession: false,
 	        };
 	        // Evaluate webaudio
 	        try {
@@ -737,9 +737,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	                sampleRate: 8000,
 	            });
 	            capabilities.sampleRate = ctx.sampleRate === 8000;
-	            ctx
-	                .close()
-	                .then(() => console.log("Closed capability detection audio context."));
+	            ctx.close();
 	        }
 	        catch (e) {
 	            console.log("WebAudio sample rate capability detection failed. Assuming fallback.");
@@ -763,6 +761,8 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	        catch (e) {
 	            console.log("Streaming capability detection failed. Assuming fallback.");
 	        }
+	        // Evaluate mediaSession
+	        capabilities.mediaSession = "mediaSession" in navigator;
 	        // Check for Chrome 89
 	        // https://stackoverflow.com/a/4900484
 	        // https://github.com/rphsoftware/revolving-door/issues/10
@@ -772,7 +772,6 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	        if (chromeVersion !== false && chromeVersion >= 89) {
 	            //Disable native resampling
 	            capabilities.sampleRate = false;
-	            console.log("Chrome 89 or newer detected, using audio code workarounds.");
 	        }
 	        return capabilities;
 	    });
@@ -1264,8 +1263,9 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	    }
 	    return samples;
 	}
+	const SMASHCUSTOMMUSIC_URL = "https://smashcustommusic.net";
 	class BrstmPlayer {
-	    constructor() {
+	    constructor(apiURL = SMASHCUSTOMMUSIC_URL) {
 	        this._state = {
 	            hasInitialized: false,
 	            capabilities: null,
@@ -1285,6 +1285,17 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	            volume: Number(localStorage.getItem("volumeoverride")) || 1,
 	            samplesReady: 0,
 	        };
+	        this._apiURL = apiURL;
+	        this._audio = document.createElement("audio");
+	        this._audio.src =
+	            "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
+	        this._audio.loop = true;
+	    }
+	    getBrstmUrl(id) {
+	        return this._apiURL + "/brstm/" + id;
+	    }
+	    getSongUrl(id) {
+	        return this._apiURL + "/json/song/" + id;
 	    }
 	    guiupd() {
 	        gui.updateState({
@@ -1449,9 +1460,15 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	    }
 	    next() { }
 	    previous() { }
-	    pause() {
+	    playPause() {
 	        this._state.paused = !this._state.paused;
 	        this._state.audioContext[this._state.paused ? "suspend" : "resume"]();
+	        if (this._state.capabilities.mediaSession) {
+	            navigator.mediaSession.playbackState =
+	                navigator.mediaSession.playbackState === "playing"
+	                    ? "paused"
+	                    : "playing";
+	        }
 	        this.guiupd();
 	    }
 	    setLoop(enable) {
@@ -1462,15 +1479,33 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	        this._state.stopped = true;
 	        gui.destroyGui();
 	    }
-	    play(url) {
+	    fetchSongDetails(id) {
 	        return __awaiter(this, void 0, void 0, function* () {
+	            let resp = yield fetch(this.getSongUrl(id));
+	            if (resp.status >= 400) {
+	                console.error(`could not fetch song details for id ${id}.`);
+	                return;
+	            }
+	            this._song = yield resp.json();
+	        });
+	    }
+	    play(id) {
+	        return __awaiter(this, void 0, void 0, function* () {
+	            let url = this.getBrstmUrl(id);
+	            this._state.capabilities = yield browserCapabilities();
+	            // fetch details
+	            this.fetchSongDetails(id).then((_) => {
+	                this._setMediaSessionData();
+	                if (this._state.capabilities.mediaSession) {
+	                    navigator.mediaSession.playbackState = "playing";
+	                }
+	            });
 	            // Entry point to the
 	            this._state.stopped = false;
 	            gui.runGUI(this);
 	            console.log(`Playing ${url}`);
 	            if (!this._state.hasInitialized) {
 	                // We haven't probed the browser for its capabilities yet
-	                this._state.capabilities = yield browserCapabilities();
 	                setInterval(() => {
 	                    gui.updateState({ loaded: this._state.samplesReady });
 	                    gui.guiUpdate();
@@ -1671,9 +1706,46 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	            this._state.gainNode.gain.setValueAtTime(this._state.volume, this._state.audioContext.currentTime);
 	        });
 	    }
+	    _setMediaSessionData() {
+	        return __awaiter(this, void 0, void 0, function* () {
+	            if (!this._state.capabilities.mediaSession) {
+	                return;
+	            }
+	            this._audio
+	                .play()
+	                .then((_) => {
+	                navigator.mediaSession.metadata = new MediaMetadata({
+	                    title: this._song.name,
+	                    album: this._song.game_name,
+	                    artist: this._song.uploader,
+	                    artwork: [
+	                        {
+	                            src: "https://ssb.wiki.gallery/images/a/a2/SSBU_spirit_Smash_Ball.png",
+	                            type: "image/png",
+	                            sizes: "560x544",
+	                        },
+	                    ],
+	                });
+	                navigator.mediaSession.setActionHandler("play", () => {
+	                    this.playPause();
+	                });
+	                navigator.mediaSession.setActionHandler("pause", () => {
+	                    this.playPause();
+	                });
+	                navigator.mediaSession.setActionHandler("stop", () => {
+	                    this.stop();
+	                });
+	                navigator.mediaSession.setActionHandler("nexttrack", () => this.next);
+	                navigator.mediaSession.setActionHandler("previoustrack", () => this.previous);
+	            })
+	                .catch((error) => {
+	                console.error(error);
+	            });
+	        });
+	    }
 	}
 
-	let player = new BrstmPlayer();
+	let player = new BrstmPlayer("https://smashcustommusic.net");
 	window.player = player;
 
 })();
