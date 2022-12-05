@@ -1,12 +1,12 @@
 // This script shouldn't do anything without explicit user interaction (Triggering playback)
-const gui = require("./gui");
-import { STREAMING_MIN_RESPONSE } from "./configProvider";
+import { STREAMING_MIN_RESPONSE, PLAYER_TAG_ID } from "./configProvider";
 import copyToChannelPolyfill from "./copyToChannelPolyfill";
 import resampler from "./resampler";
 import unlock from "./webAudioUnlock";
 import { browserCapabilities, Capabilities } from "./browserCapabilities";
 import { sleep, awaitMessage } from "./util";
 import { Brstm } from "brstm";
+import { PlayerEvent } from "./eventTypes";
 
 function partitionedGetSamples(brstm, start, size) {
   let samples = [];
@@ -96,9 +96,11 @@ export class BrstmPlayer {
     };
     this._apiURL = apiURL;
     this._audio = document.createElement("audio");
+    this._audio.id = PLAYER_TAG_ID;
     this._audio.src =
       "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
     this._audio.loop = true;
+    document.body.appendChild(this._audio);
   }
 
   private getBrstmUrl(id: string): string {
@@ -114,8 +116,11 @@ export class BrstmPlayer {
   private _apiURL: string;
   private _song: SongDetails;
 
-  guiupd() {
-    gui.updateState({
+  sendEvent(type: PlayerEvent, payload: object = {}) {
+    this._audio.dispatchEvent(new CustomEvent(type, { detail: payload }));
+  }
+  sendUpdateStateEvent() {
+    this.sendEvent(PlayerEvent.step, {
       position: this._state.playbackCurrentSample,
       paused: this._state.paused,
       volume: this._state.volume,
@@ -147,6 +152,7 @@ export class BrstmPlayer {
   private loadSongStreaming(url: string): Promise<void> {
     // New, fancy song loading logic
     return new Promise(async (resolve, reject) => {
+      this.sendEvent(PlayerEvent.loading);
       let resp: Response;
       let reader: ReadableStreamDefaultReader;
       try {
@@ -171,7 +177,7 @@ export class BrstmPlayer {
           d = await reader.read(); // Read next chunk
         } catch (e) {
           if (resolved) {
-            gui.updateState({
+            this.sendEvent(PlayerEvent.killed, {
               streamingDied: true,
               buffering: false,
               ready: true,
@@ -271,7 +277,10 @@ export class BrstmPlayer {
 
   setVolume(level: number) {
     this._state.volume = level;
-    this.guiupd();
+    this.sendEvent(PlayerEvent.setVolume, {
+      volume: level,
+    });
+    this.sendUpdateStateEvent();
     if (this._state.gainNode)
       this._state.gainNode.gain.setValueAtTime(
         this._state.volume,
@@ -286,10 +295,17 @@ export class BrstmPlayer {
   }
   seek(to: number) {
     this._state.playbackCurrentSample = Math.floor(to);
-    this.guiupd();
+    this.sendEvent(PlayerEvent.seek, {
+      toSample: this._state.playbackCurrentSample,
+    });
+    this.sendUpdateStateEvent();
   }
-  next() {}
-  previous() {}
+  next() {
+    this.sendEvent(PlayerEvent.next);
+  }
+  previous() {
+    this.sendEvent(PlayerEvent.previous);
+  }
   playPause() {
     this._state.paused = !this._state.paused;
     this._state.audioContext[this._state.paused ? "suspend" : "resume"]();
@@ -299,15 +315,21 @@ export class BrstmPlayer {
           ? "paused"
           : "playing";
     }
-    this.guiupd();
+    this.sendEvent(PlayerEvent.playPause, {
+      playing: navigator.mediaSession.playbackState === "playing",
+    });
+    this.sendUpdateStateEvent();
   }
   setLoop(enable: boolean) {
     this._state.enableLoop = enable;
-    this.guiupd();
+    this.sendEvent(PlayerEvent.setLoop, {
+      loop: enable,
+    });
+    this.sendUpdateStateEvent();
   }
   stop() {
     this._state.stopped = true;
-    gui.destroyGui();
+    this.sendEvent(PlayerEvent.stop);
   }
 
   async fetchSongDetails(id: string): Promise<void> {
@@ -321,6 +343,10 @@ export class BrstmPlayer {
 
   async play(id: string) {
     let url = this.getBrstmUrl(id);
+    this.sendEvent(PlayerEvent.play, {
+      id: id,
+      url: url,
+    });
     this._state.capabilities = await browserCapabilities();
 
     // fetch details
@@ -333,15 +359,12 @@ export class BrstmPlayer {
 
     // Entry point to the
     this._state.stopped = false;
-    gui.runGUI(this);
     console.log(`Playing ${url}`);
     if (!this._state.hasInitialized) {
-      // We haven't probed the browser for its capabilities yet
-      setInterval(() => {
-        gui.updateState({ loaded: this._state.samplesReady });
-        gui.guiUpdate();
-      }, 100);
-    } // Now we have!
+      this.sendEvent(PlayerEvent.start, {
+        loaded: this._state.samplesReady,
+      });
+    }
 
     if (this._state.playAudioRunning) return;
     this._state.playAudioRunning = true;
@@ -360,8 +383,8 @@ export class BrstmPlayer {
     this._state.playbackCurrentSample = 0; // Set the state for playback
     this._state.paused = false; // Unpause it
 
-    gui.updateState({
-      // Populate GUI with initial, yet unknown data
+    // Populate GUI with initial, yet unknown data
+    this.sendEvent(PlayerEvent.resetState, {
       ready: false,
       position: 0,
       samples: 1e6,
@@ -377,7 +400,11 @@ export class BrstmPlayer {
         ? this.loadSongStreaming.bind(this)
         : this.loadSongLegacy.bind(this))(url); // Begin loading based on capabilities
     } catch (e) {
-      gui.updateState({ streamingDied: true, ready: true, buffering: false });
+      this.sendEvent(PlayerEvent.killed, {
+        streamingDied: true,
+        buffering: false,
+        ready: true,
+      });
       console.error(e);
       this._state.playAudioRunning = false;
       return;
@@ -425,16 +452,16 @@ export class BrstmPlayer {
       loadBufferSize += 20;
     }
 
-    gui.updateState({
+    this.sendEvent(PlayerEvent.loaded, {
       ready: true,
       samples: this._state.brstm.metadata.totalSamples,
+      sampleRate: this._state.brstm.metadata.sampleRate,
     });
-    gui.updateState({ sampleRate: this._state.brstm.metadata.sampleRate });
     this._state.playAudioRunning = false;
     // Set the audio loop callback (called by the browser every time the internal buffer expires)
     this._state.scriptNode.onaudioprocess = (audioProcessingEvent) => {
       if (this._state.stopped === true) return;
-      this.guiupd();
+      this.sendUpdateStateEvent();
       // Get a handle for the audio buffer
       let outputBuffer = audioProcessingEvent.outputBuffer;
       if (!outputBuffer.copyToChannel)
@@ -447,7 +474,9 @@ export class BrstmPlayer {
         this._state.samplesReady
       ) {
         // override, return early.
-        gui.updateState({ buffering: true });
+        this.sendEvent(PlayerEvent.buffering, {
+          buffering: true,
+        });
         console.log("Buffering....");
         outputBuffer.copyToChannel(
           new Float32Array(this._state.scriptNode.bufferSize).fill(0),
@@ -459,7 +488,9 @@ export class BrstmPlayer {
         );
         return;
       }
-      gui.updateState({ buffering: false });
+      this.sendEvent(PlayerEvent.buffering, {
+        buffering: false,
+      });
       if (this._state.paused) {
         // If we are paused, we just bail out and return with just zeros
         outputBuffer.copyToChannel(

@@ -1,6 +1,9 @@
+import { PLAYER_TAG_ID } from "./configProvider";
+import { PlayerEvent } from "./eventTypes";
 const ge = require("./gestureEngine").getInstance();
 
 let state = {
+  display: false,
   position: 0,
   samples: 1e6,
   loaded: 5e5,
@@ -44,7 +47,7 @@ function hEvent(a) {
       overrides.volume = null;
       localStorage.setItem("volumeoverride", volume);
     }
-    module.exports.guiUpdate();
+    guiUpdate();
   } else {
     if (a.type === "touchend") {
       state.volume = overrides.volume;
@@ -80,7 +83,7 @@ function hsEvent(a) {
       overrides.position = null;
     }
 
-    module.exports.guiUpdate();
+    guiUpdate();
   } else {
     if (a.type === "touchend") {
       api.seek(overrides.position);
@@ -95,7 +98,7 @@ function seekOp(x, y) {
   if (posi < state.loaded) {
     overrides.position = posi;
   }
-  module.exports.guiUpdate();
+  guiUpdate();
 }
 
 function seekFin(x, y) {
@@ -106,13 +109,13 @@ function seekFin(x, y) {
   }
   api.seek(posi);
   overrides.position = null;
-  module.exports.guiUpdate();
+  guiUpdate();
 }
 
 function volOp(x, y) {
   y = Math.round(y);
   overrides.volume = 1 - y / 84;
-  module.exports.guiUpdate();
+  guiUpdate();
 }
 
 function volFin(x, y) {
@@ -121,17 +124,19 @@ function volFin(x, y) {
   overrides.volume = null;
   localStorage.setItem("volumeoverride", volume);
   api.setVolume(volume);
-  module.exports.guiUpdate();
+  guiUpdate();
 }
 
-module.exports.updateState = function (newState) {
+function updateState(newState) {
   Object.assign(state, newState);
-};
+}
 
-module.exports.runGUI = function (a) {
+function runGUI(a) {
+  addEventHandlers();
   api = a;
   // Creating GUI
   guiElement = document.createElement("div");
+  guiElement.style.display = "none";
   guiElement.classList.add("guiholder");
   guiElement.innerHTML = `
 <div class="error" style="display: none">
@@ -185,7 +190,7 @@ module.exports.runGUI = function (a) {
     .querySelector("#pl-pause-play")
     .addEventListener("click", function () {
       api.playPause();
-      module.exports.guiUpdate();
+      guiUpdate();
     });
 
   document.querySelector("#pl-loop-box").addEventListener("input", function () {
@@ -202,7 +207,7 @@ module.exports.runGUI = function (a) {
   ge.registerFinEvent("seek", seekFin);
   ge.registerOpEvent("volume", volOp);
   ge.registerFinEvent("volume", volFin);
-};
+}
 
 let lastShowLoading = null;
 let lastReady = null;
@@ -215,13 +220,17 @@ let lastLooping = null;
 let lastLoaded = -1;
 let lastStreamState = null;
 
-module.exports.destroyGui = function () {
+function destroyGui() {
   if (guiElement) {
-    guiElement.remove();
+    state.display = false;
+    guiElement.style.display = "none";
   }
-};
+}
 
-module.exports.guiUpdate = function () {
+function guiUpdate() {
+  if (state.display) {
+    guiElement.style.display = "block";
+  }
   if (guiElement) {
     if (lastStreamState !== state.streamingDied) {
       guiElement.querySelector(".error").style.display = state.streamingDied
@@ -317,4 +326,93 @@ module.exports.guiUpdate = function () {
       lastLooping = state.looping;
     }
   }
-};
+}
+
+function addEventHandlers() {
+  let audio = document.getElementById(PLAYER_TAG_ID);
+  if (audio) {
+    audio.addEventListener(PlayerEvent.step, (evt) => {
+      state = {
+        ...state,
+        position: evt.detail.position,
+        paused: evt.detail.paused,
+        volume: evt.detail.volume,
+        loaded: evt.detail.loaded,
+        looping: evt.detail.looping,
+      };
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.killed, (evt) => {
+      console.log(evt);
+      state = {
+        ...state,
+        streamingDied: evt.detail.streamingDied,
+        buffering: evt.detail.buffering,
+        ready: evt.detail.ready,
+      };
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.setVolume, (evt) => {
+      console.log(evt);
+      state.volume = evt.detail.volume;
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.seek, (evt) => {
+      console.log(evt);
+      state.position = evt.detail.toSample;
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.playPause, (evt) => {
+      console.log(evt);
+      state.paused = evt.detail.playing;
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.setLoop, (evt) => {
+      console.log(evt);
+      state.looping = evt.detail.loop;
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.stop, (evt) => {
+      console.log(evt);
+      destroyGui();
+    });
+    audio.addEventListener(PlayerEvent.start, (evt) => {
+      console.log(evt);
+      state.loaded = evt.detail.loaded;
+      state.display = true;
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.resetState, (evt) => {
+      console.log(evt);
+      state = {
+        ...state,
+        ready: evt.detail.ready,
+        position: evt.detail.position,
+        samples: evt.detail.samples,
+        loaded: evt.detail.loaded,
+        volume: evt.detail.volume,
+        paused: evt.detail.paused,
+        buffering: evt.detail.buffering,
+        sampleRate: evt.detail.sampleRate,
+        streamingDied: evt.detail.streamingDied,
+      };
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.loaded, (evt) => {
+      console.log(evt);
+      state = {
+        ...state,
+        ready: evt.detail.ready,
+        samples: evt.detail.samples,
+        sampleRate: evt.detail.sampleRate,
+      };
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.buffering, (evt) => {
+      state.buffering = evt.detail.buffering;
+      guiUpdate();
+    });
+  }
+}
+
+export { runGUI };
