@@ -1,12 +1,14 @@
 export interface Capabilities {
   sampleRate: boolean;
   streaming: boolean;
+  mediaSession: boolean;
 }
 
 export async function browserCapabilities(): Promise<Capabilities> {
   let capabilities: Capabilities = {
     sampleRate: false,
     streaming: false,
+    mediaSession: false,
   };
 
   // Evaluate webaudio
@@ -16,9 +18,7 @@ export async function browserCapabilities(): Promise<Capabilities> {
     });
 
     capabilities.sampleRate = ctx.sampleRate === 8000;
-    ctx
-      .close()
-      .then(() => console.log("Closed capability detection audio context."));
+    ctx.close();
   } catch (e) {
     console.log(
       "WebAudio sample rate capability detection failed. Assuming fallback."
@@ -46,6 +46,9 @@ export async function browserCapabilities(): Promise<Capabilities> {
     console.log("Streaming capability detection failed. Assuming fallback.");
   }
 
+  // Evaluate mediaSession
+  capabilities.mediaSession = "mediaSession" in navigator;
+
   // Check for Chrome 89
   // https://stackoverflow.com/a/4900484
   // https://github.com/rphsoftware/revolving-door/issues/10
@@ -56,8 +59,6 @@ export async function browserCapabilities(): Promise<Capabilities> {
   if (chromeVersion !== false && chromeVersion >= 89) {
     //Disable native resampling
     capabilities.sampleRate = false;
-
-    console.log("Chrome 89 or newer detected, using audio code workarounds.");
   }
 
   return capabilities;

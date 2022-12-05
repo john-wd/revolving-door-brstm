@@ -10,17 +10,17 @@
     />
   </head>
   <body>
-    Song id:<input type="number" min="0" max="99999" value="25772" id="aaa" />
+    Song id:<input type="number" min="0" max="99999" value="25772" id="song" />
 
     <br />
     <div>
       <button
         href="#"
-        onclick="window.player.play('https://smashcustommusic.net/brstm/' + document.querySelector('#aaa').value + '&noIncrement=1')"
+        onclick="window.player.play(document.querySelector('#song').value)"
       >
         <span class="material-icons">play_arrow</span>
       </button>
-      <button onclick="window.player.pause()">
+      <button onclick="window.player.playPause()">
         <span class="material-icons">pause</span>
       </button>
       <button onclick="window.player.stop()">
@@ -39,16 +39,14 @@
         <span class="material-icons">volume_up</span>
       </button>
     </div>
-    <script src="dist/bundle.min.js?version=202"></script>
+    <script src="dist/bundle.min.js"></script>
     <script>
       if (window.location.hash.length > 1) {
         if (window.location.hash.startsWith("#eval")) {
           eval(decodeURIComponent(window.location.hash.slice(5)));
         } else {
           let z = window.location.hash.slice(1);
-          window.player.play(
-            "https://smashcustommusic.net/brstm/" + z + "&noIncrement=1"
-          );
+          window.player.play(z);
         }
       }
     </script>

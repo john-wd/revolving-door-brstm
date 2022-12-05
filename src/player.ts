@@ -29,6 +29,29 @@ function partitionedGetSamples(brstm, start, size) {
   return samples;
 }
 
+const SMASHCUSTOMMUSIC_URL = "https://smashcustommusic.net";
+
+interface SongDetails {
+  approved_by: string;
+  available: boolean;
+  description: string;
+  downloads: number;
+  end_loop_point: number;
+  game_banner_exists: boolean;
+  game_id: number;
+  game_name: string;
+  length: number;
+  loop_type: string;
+  name: string;
+  ok: boolean;
+  remix: boolean;
+  sample_rate: number;
+  size: number;
+  start_loop_point: number;
+  theme_type: string;
+  uploader: string;
+}
+
 // Player state variables
 interface State {
   hasInitialized: boolean; // If we measured browser capabilities yet
@@ -51,7 +74,7 @@ interface State {
 }
 
 export class BrstmPlayer {
-  constructor() {
+  constructor(apiURL: string = SMASHCUSTOMMUSIC_URL) {
     this._state = {
       hasInitialized: false,
       capabilities: null,
@@ -71,9 +94,25 @@ export class BrstmPlayer {
       volume: Number(localStorage.getItem("volumeoverride")) || 1,
       samplesReady: 0,
     };
+    this._apiURL = apiURL;
+    this._audio = document.createElement("audio");
+    this._audio.src =
+      "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
+    this._audio.loop = true;
+  }
+
+  private getBrstmUrl(id: string): string {
+    return this._apiURL + "/brstm/" + id;
+  }
+
+  private getSongUrl(id: string): string {
+    return this._apiURL + "/json/song/" + id;
   }
 
   private _state: State;
+  private _audio: HTMLAudioElement;
+  private _apiURL: string;
+  private _song: SongDetails;
 
   guiupd() {
     gui.updateState({
@@ -251,9 +290,15 @@ export class BrstmPlayer {
   }
   next() {}
   previous() {}
-  pause() {
+  playPause() {
     this._state.paused = !this._state.paused;
     this._state.audioContext[this._state.paused ? "suspend" : "resume"]();
+    if (this._state.capabilities.mediaSession) {
+      navigator.mediaSession.playbackState =
+        navigator.mediaSession.playbackState === "playing"
+          ? "paused"
+          : "playing";
+    }
     this.guiupd();
   }
   setLoop(enable: boolean) {
@@ -265,14 +310,33 @@ export class BrstmPlayer {
     gui.destroyGui();
   }
 
-  async play(url: string) {
+  async fetchSongDetails(id: string): Promise<void> {
+    let resp = await fetch(this.getSongUrl(id));
+    if (resp.status >= 400) {
+      console.error(`could not fetch song details for id ${id}.`);
+      return;
+    }
+    this._song = await resp.json();
+  }
+
+  async play(id: string) {
+    let url = this.getBrstmUrl(id);
+    this._state.capabilities = await browserCapabilities();
+
+    // fetch details
+    this.fetchSongDetails(id).then((_) => {
+      this._setMediaSessionData();
+      if (this._state.capabilities.mediaSession) {
+        navigator.mediaSession.playbackState = "playing";
+      }
+    });
+
     // Entry point to the
     this._state.stopped = false;
     gui.runGUI(this);
     console.log(`Playing ${url}`);
     if (!this._state.hasInitialized) {
       // We haven't probed the browser for its capabilities yet
-      this._state.capabilities = await browserCapabilities();
       setInterval(() => {
         gui.updateState({ loaded: this._state.samplesReady });
         gui.guiUpdate();
@@ -553,5 +617,38 @@ export class BrstmPlayer {
       this._state.volume,
       this._state.audioContext.currentTime
     );
+  }
+
+  async _setMediaSessionData() {
+    if (!this._state.capabilities.mediaSession) {
+      return;
+    }
+
+    this._audio
+      .play()
+      .then((_) => {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: this._song.name,
+          album: this._song.game_name,
+          artist: this._song.uploader,
+        });
+
+        navigator.mediaSession.setActionHandler("play", (d) => {
+          console.log("playpause", d);
+          this.playPause();
+        });
+        navigator.mediaSession.setActionHandler("pause", (d) => {
+          console.log("playpause", d);
+          this.playPause();
+        });
+        navigator.mediaSession.setActionHandler("nexttrack", (d) => this.next);
+        navigator.mediaSession.setActionHandler(
+          "previoustrack",
+          (d) => this.previous
+        );
+      })
+      .catch((error) => {
+        console.error(error);
+      });
   }
 }

@@ -129,7 +129,6 @@ module.exports.updateState = function (newState) {
 };
 
 module.exports.runGUI = function (a) {
-  console.log(ge);
   api = a;
   // Creating GUI
   guiElement = document.createElement("div");
@@ -185,7 +184,7 @@ module.exports.runGUI = function (a) {
   document
     .querySelector("#pl-pause-play")
     .addEventListener("click", function () {
-      api.pause();
+      api.playPause();
       module.exports.guiUpdate();
     });
 
