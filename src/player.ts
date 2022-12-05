@@ -646,6 +646,9 @@ export class BrstmPlayer {
         navigator.mediaSession.setActionHandler("pause", () => {
           this.playPause();
         });
+        navigator.mediaSession.setActionHandler("stop", () => {
+          this.stop();
+        });
         navigator.mediaSession.setActionHandler("nexttrack", () => this.next);
         navigator.mediaSession.setActionHandler(
           "previoustrack",
