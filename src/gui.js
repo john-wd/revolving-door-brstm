@@ -343,47 +343,39 @@ function addEventHandlers() {
       guiUpdate();
     });
     audio.addEventListener(PlayerEvent.killed, (evt) => {
-      console.log(evt);
       state = {
         ...state,
         streamingDied: evt.detail.streamingDied,
         buffering: evt.detail.buffering,
         ready: evt.detail.ready,
       };
-      guiUpdate();
+      destroyGui();
     });
     audio.addEventListener(PlayerEvent.setVolume, (evt) => {
-      console.log(evt);
       state.volume = evt.detail.volume;
       guiUpdate();
     });
     audio.addEventListener(PlayerEvent.seek, (evt) => {
-      console.log(evt);
       state.position = evt.detail.toSample;
       guiUpdate();
     });
     audio.addEventListener(PlayerEvent.playPause, (evt) => {
-      console.log(evt);
       state.paused = evt.detail.playing;
       guiUpdate();
     });
     audio.addEventListener(PlayerEvent.setLoop, (evt) => {
-      console.log(evt);
       state.looping = evt.detail.loop;
       guiUpdate();
     });
     audio.addEventListener(PlayerEvent.stop, (evt) => {
-      console.log(evt);
       destroyGui();
     });
     audio.addEventListener(PlayerEvent.start, (evt) => {
-      console.log(evt);
       state.loaded = evt.detail.loaded;
       state.display = true;
       guiUpdate();
     });
     audio.addEventListener(PlayerEvent.resetState, (evt) => {
-      console.log(evt);
       state = {
         ...state,
         ready: evt.detail.ready,
@@ -399,7 +391,6 @@ function addEventHandlers() {
       guiUpdate();
     });
     audio.addEventListener(PlayerEvent.loaded, (evt) => {
-      console.log(evt);
       state = {
         ...state,
         ready: evt.detail.ready,
