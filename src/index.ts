@@ -1,6 +1,6 @@
 import { BrstmPlayer } from "./player";
 const gui = require("./gui");
 
-let player = new BrstmPlayer("https://smashcustommusic.net");
+let player = new BrstmPlayer("https://smashcustommusic.net/brstm");
 gui.runGUI(player);
 window.player = player;

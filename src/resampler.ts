@@ -97,7 +97,7 @@ export default class Resampler {
     var toCompile =
       "var outputOffset = 0;\
     if (bufferLength > 0) {\
-        var buffer = this.inputBuffer;\
+        var buffer = this._inputBuffer;\
         var weight = 0;";
     for (var channel = 0; channel < this._channels; ++channel) {
       toCompile += "var output" + channel + " = 0;";
@@ -106,8 +106,8 @@ export default class Resampler {
       "var actualPosition = 0;\
         var amountToNext = 0;\
         var alreadyProcessedTail = !this.tailExists;\
-        this.tailExists = false;\
-        var outputBuffer = this.outputBuffer;\
+        this._tailExists = false;\
+        var outputBuffer = this._outputBuffer;\
         var currentPosition = 0;\
         do {\
             if (alreadyProcessedTail) {\
@@ -120,9 +120,9 @@ export default class Resampler {
     toCompile +=
       "}\
             else {\
-                weight = this.lastWeight;";
+                weight = this._lastWeight;";
     for (channel = 0; channel < this._channels; ++channel) {
-      toCompile += "output" + channel + " = this.lastOutput[" + channel + "];";
+      toCompile += "output" + channel + " = this._lastOutput[" + channel + "];";
     }
     toCompile +=
       "alreadyProcessedTail = true;\
@@ -165,12 +165,12 @@ export default class Resampler {
     toCompile +=
       "}\
             else {\
-                this.lastWeight = weight;";
+                this._lastWeight = weight;";
     for (channel = 0; channel < this._channels; ++channel) {
-      toCompile += "this.lastOutput[" + channel + "] = output" + channel + ";";
+      toCompile += "this._lastOutput[" + channel + "] = output" + channel + ";";
     }
     toCompile +=
-      "this.tailExists = true;\
+      "this._tailExists = true;\
                 break;\
             }\
         } while (actualPosition < bufferLength);\
@@ -182,13 +182,13 @@ export default class Resampler {
     var toCompile =
       "var outputOffset = 0;\
     if (bufferLength > 0) {\
-        var buffer = this.inputBuffer;\
-        var weight = this.lastWeight;\
+        var buffer = this._inputBuffer;\
+        var weight = this._lastWeight;\
         var firstWeight = 0;\
         var secondWeight = 0;\
         var sourceOffset = 0;\
         var outputOffset = 0;\
-        var outputBuffer = this.outputBuffer;\
+        var outputBuffer = this._outputBuffer;\
         for (; weight < 1; weight += " +
       this._ratioWeight +
       ") {\
@@ -196,7 +196,7 @@ export default class Resampler {
             firstWeight = 1 - secondWeight;";
     for (var channel = 0; channel < this._channels; ++channel) {
       toCompile +=
-        "outputBuffer[outputOffset++] = (this.lastOutput[" +
+        "outputBuffer[outputOffset++] = (this._lastOutput[" +
         channel +
         "] * firstWeight) + (buffer[" +
         channel +
@@ -229,10 +229,11 @@ export default class Resampler {
       ";\
         }";
     for (var channel = 0; channel < this._channels; ++channel) {
-      toCompile += "this.lastOutput[" + channel + "] = buffer[sourceOffset++];";
+      toCompile +=
+        "this._lastOutput[" + channel + "] = buffer[sourceOffset++];";
     }
     toCompile +=
-      "this.lastWeight = weight % 1;\
+      "this._lastWeight = weight % 1;\
     }\
     return outputOffset;";
     this._resampler = Function("bufferLength", toCompile);

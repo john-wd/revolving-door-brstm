@@ -139,6 +139,8 @@
         PlayerEvent["killed"] = "brstm_killed";
         PlayerEvent["step"] = "brstm_step";
         PlayerEvent["resetState"] = "brstm_resetstate";
+        PlayerEvent["playlistAdd"] = "brstm_playlist_add";
+        PlayerEvent["playlistRemove"] = "brstm_playlist_remove";
     })(PlayerEvent || (PlayerEvent = {}));
 
     const ge = require$$0.getInstance();
@@ -429,47 +431,38 @@
                 guiUpdate();
             });
             audio.addEventListener(PlayerEvent.killed, (evt) => {
-                console.log(evt);
                 state = Object.assign(Object.assign({}, state), { streamingDied: evt.detail.streamingDied, buffering: evt.detail.buffering, ready: evt.detail.ready });
-                guiUpdate();
+                destroyGui();
             });
             audio.addEventListener(PlayerEvent.setVolume, (evt) => {
-                console.log(evt);
                 state.volume = evt.detail.volume;
                 guiUpdate();
             });
             audio.addEventListener(PlayerEvent.seek, (evt) => {
-                console.log(evt);
                 state.position = evt.detail.toSample;
                 guiUpdate();
             });
             audio.addEventListener(PlayerEvent.playPause, (evt) => {
-                console.log(evt);
                 state.paused = evt.detail.playing;
                 guiUpdate();
             });
             audio.addEventListener(PlayerEvent.setLoop, (evt) => {
-                console.log(evt);
                 state.looping = evt.detail.loop;
                 guiUpdate();
             });
             audio.addEventListener(PlayerEvent.stop, (evt) => {
-                console.log(evt);
                 destroyGui();
             });
             audio.addEventListener(PlayerEvent.start, (evt) => {
-                console.log(evt);
                 state.loaded = evt.detail.loaded;
                 state.display = true;
                 guiUpdate();
             });
             audio.addEventListener(PlayerEvent.resetState, (evt) => {
-                console.log(evt);
                 state = Object.assign(Object.assign({}, state), { ready: evt.detail.ready, position: evt.detail.position, samples: evt.detail.samples, loaded: evt.detail.loaded, volume: evt.detail.volume, paused: evt.detail.paused, buffering: evt.detail.buffering, sampleRate: evt.detail.sampleRate, streamingDied: evt.detail.streamingDied });
                 guiUpdate();
             });
             audio.addEventListener(PlayerEvent.loaded, (evt) => {
-                console.log(evt);
                 state = Object.assign(Object.assign({}, state), { ready: evt.detail.ready, samples: evt.detail.samples, sampleRate: evt.detail.sampleRate });
                 guiUpdate();
             });
@@ -583,7 +576,7 @@
         compileMultiTapFunction() {
             var toCompile = "var outputOffset = 0;\
     if (bufferLength > 0) {\
-        var buffer = this.inputBuffer;\
+        var buffer = this._inputBuffer;\
         var weight = 0;";
             for (var channel = 0; channel < this._channels; ++channel) {
                 toCompile += "var output" + channel + " = 0;";
@@ -592,8 +585,8 @@
                 "var actualPosition = 0;\
         var amountToNext = 0;\
         var alreadyProcessedTail = !this.tailExists;\
-        this.tailExists = false;\
-        var outputBuffer = this.outputBuffer;\
+        this._tailExists = false;\
+        var outputBuffer = this._outputBuffer;\
         var currentPosition = 0;\
         do {\
             if (alreadyProcessedTail) {\
@@ -606,9 +599,9 @@
             toCompile +=
                 "}\
             else {\
-                weight = this.lastWeight;";
+                weight = this._lastWeight;";
             for (channel = 0; channel < this._channels; ++channel) {
-                toCompile += "output" + channel + " = this.lastOutput[" + channel + "];";
+                toCompile += "output" + channel + " = this._lastOutput[" + channel + "];";
             }
             toCompile +=
                 "alreadyProcessedTail = true;\
@@ -651,12 +644,12 @@
             toCompile +=
                 "}\
             else {\
-                this.lastWeight = weight;";
+                this._lastWeight = weight;";
             for (channel = 0; channel < this._channels; ++channel) {
-                toCompile += "this.lastOutput[" + channel + "] = output" + channel + ";";
+                toCompile += "this._lastOutput[" + channel + "] = output" + channel + ";";
             }
             toCompile +=
-                "this.tailExists = true;\
+                "this._tailExists = true;\
                 break;\
             }\
         } while (actualPosition < bufferLength);\
@@ -667,13 +660,13 @@
         compileLinearInterpolationFunction() {
             var toCompile = "var outputOffset = 0;\
     if (bufferLength > 0) {\
-        var buffer = this.inputBuffer;\
-        var weight = this.lastWeight;\
+        var buffer = this._inputBuffer;\
+        var weight = this._lastWeight;\
         var firstWeight = 0;\
         var secondWeight = 0;\
         var sourceOffset = 0;\
         var outputOffset = 0;\
-        var outputBuffer = this.outputBuffer;\
+        var outputBuffer = this._outputBuffer;\
         for (; weight < 1; weight += " +
                 this._ratioWeight +
                 ") {\
@@ -681,7 +674,7 @@
             firstWeight = 1 - secondWeight;";
             for (var channel = 0; channel < this._channels; ++channel) {
                 toCompile +=
-                    "outputBuffer[outputOffset++] = (this.lastOutput[" +
+                    "outputBuffer[outputOffset++] = (this._lastOutput[" +
                         channel +
                         "] * firstWeight) + (buffer[" +
                         channel +
@@ -714,10 +707,11 @@
                     ";\
         }";
             for (var channel = 0; channel < this._channels; ++channel) {
-                toCompile += "this.lastOutput[" + channel + "] = buffer[sourceOffset++];";
+                toCompile +=
+                    "this._lastOutput[" + channel + "] = buffer[sourceOffset++];";
             }
             toCompile +=
-                "this.lastWeight = weight % 1;\
+                "this._lastWeight = weight % 1;\
     }\
     return outputOffset;";
             this._resampler = Function("bufferLength", toCompile);
@@ -1347,8 +1341,12 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
         return samples;
     }
     const SMASHCUSTOMMUSIC_URL = "https://smashcustommusic.net";
+    const SILENCE_URL = "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
+    const ARTWORK_URL = "https://ssb.wiki.gallery/images/a/a2/SSBU_spirit_Smash_Ball.png";
     class BrstmPlayer {
         constructor(apiURL = SMASHCUSTOMMUSIC_URL) {
+            this._playlist = [];
+            this._idsInPlaylist = new Set();
             this._state = {
                 hasInitialized: false,
                 capabilities: null,
@@ -1371,19 +1369,16 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
             this._apiURL = apiURL;
             this._audio = document.createElement("audio");
             this._audio.id = PLAYER_TAG_ID;
-            this._audio.src =
-                "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
+            this._audio.src = SILENCE_URL;
             this._audio.loop = true;
             document.body.appendChild(this._audio);
         }
         getBrstmUrl(id) {
-            return this._apiURL + "/brstm/" + id;
-        }
-        getSongUrl(id) {
-            return this._apiURL + "/json/song/" + id;
+            return `${this._apiURL}/${id}`;
         }
         sendEvent(type, payload = {}) {
-            this._audio.dispatchEvent(new CustomEvent(type, { detail: payload }));
+            // dispatchEvent(new CustomEvent(type, { detail: payload }));
+            this._audio.dispatchEvent(new CustomEvent(type, { detail: payload, bubbles: true }));
         }
         sendUpdateStateEvent() {
             this.sendEvent(PlayerEvent.step, {
@@ -1554,10 +1549,24 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
             this.sendUpdateStateEvent();
         }
         next() {
-            this.sendEvent(PlayerEvent.next);
+            this.movePlaylist(true);
         }
         previous() {
+            this.movePlaylist(false);
+        }
+        movePlaylist(up = true) {
+            if (this.playlist.length === 0) {
+                return;
+            }
+            let idx = up
+                ? Math.min(this._currentIndex + 1, this._playlist.length - 1)
+                : Math.max(this._currentIndex - 1, 0);
+            if (idx === this._currentIndex) {
+                return;
+            }
             this.sendEvent(PlayerEvent.previous);
+            this._currentIndex = idx;
+            this.play(this.playlist[idx]);
         }
         playPause() {
             this._state.paused = !this._state.paused;
@@ -1584,31 +1593,50 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
             this._state.stopped = true;
             this.sendEvent(PlayerEvent.stop);
         }
-        fetchSongDetails(id) {
+        get currentSong() {
+            return this._currentSong;
+        }
+        get playlist() {
+            return this._playlist;
+        }
+        addToPlaylist(song) {
+            if (!song) {
+                return;
+            }
+            if (this._idsInPlaylist.has(song.id)) {
+                return;
+            }
+            this.sendEvent(PlayerEvent.playlistAdd, song);
+            this._playlist.push(song);
+            this._idsInPlaylist.add(song.id);
+        }
+        removeFromPlaylist(songId) {
+            this.sendEvent(PlayerEvent.playlistRemove, {
+                songId,
+            });
+            this._playlist = this._playlist.filter((s) => s.id !== songId);
+        }
+        clearPlaylist() {
+            this._playlist = [];
+        }
+        init(song) {
             return __awaiter(this, void 0, void 0, function* () {
-                let resp = yield fetch(this.getSongUrl(id));
-                if (resp.status >= 400) {
-                    console.error(`could not fetch song details for id ${id}.`);
-                    return;
-                }
-                this._song = yield resp.json();
+                this.addToPlaylist(song);
+                this._currentIndex = 0;
+                yield this.play(song);
             });
         }
-        play(id) {
+        play(song) {
             return __awaiter(this, void 0, void 0, function* () {
-                let url = this.getBrstmUrl(id);
-                this.sendEvent(PlayerEvent.play, {
-                    id: id,
-                    url: url,
-                });
+                this._currentSong = song;
+                let url = this.getBrstmUrl(song.id);
+                this.sendEvent(PlayerEvent.play, Object.assign(Object.assign({}, song), { url: url }));
                 this._state.capabilities = yield browserCapabilities();
                 // fetch details
-                this.fetchSongDetails(id).then((_) => {
-                    this._setMediaSessionData();
-                    if (this._state.capabilities.mediaSession) {
-                        navigator.mediaSession.playbackState = "playing";
-                    }
-                });
+                this._setMediaSessionData(song);
+                if (this._state.capabilities.mediaSession) {
+                    navigator.mediaSession.playbackState = "playing";
+                }
                 // Entry point to the
                 this._state.stopped = false;
                 console.log(`Playing ${url}`);
@@ -1820,7 +1848,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
                 this._state.gainNode.gain.setValueAtTime(this._state.volume, this._state.audioContext.currentTime);
             });
         }
-        _setMediaSessionData() {
+        _setMediaSessionData(song) {
             return __awaiter(this, void 0, void 0, function* () {
                 if (!this._state.capabilities.mediaSession) {
                     return;
@@ -1829,12 +1857,12 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
                     .play()
                     .then((_) => {
                     navigator.mediaSession.metadata = new MediaMetadata({
-                        title: this._song.name,
-                        album: this._song.game_name,
-                        artist: this._song.uploader,
+                        title: song.name,
+                        album: song.game_name,
+                        artist: song.uploader,
                         artwork: [
                             {
-                                src: "https://ssb.wiki.gallery/images/a/a2/SSBU_spirit_Smash_Ball.png",
+                                src: ARTWORK_URL,
                                 type: "image/png",
                                 sizes: "560x544",
                             },
@@ -1859,7 +1887,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
         }
     }
 
-    let player = new BrstmPlayer("https://smashcustommusic.net");
+    let player = new BrstmPlayer("https://smashcustommusic.net/brstm");
     gui.runGUI(player);
     window.player = player;
 

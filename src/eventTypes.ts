@@ -15,4 +15,6 @@ export enum PlayerEvent {
   killed = "brstm_killed",
   step = "brstm_step",
   resetState = "brstm_resetstate",
+  playlistAdd = "brstm_playlist_add",
+  playlistRemove = "brstm_playlist_remove",
 }

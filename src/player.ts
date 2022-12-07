@@ -30,26 +30,20 @@ function partitionedGetSamples(brstm, start, size) {
 }
 
 const SMASHCUSTOMMUSIC_URL = "https://smashcustommusic.net";
+const SILENCE_URL =
+  "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
+const ARTWORK_URL =
+  "https://ssb.wiki.gallery/images/a/a2/SSBU_spirit_Smash_Ball.png";
 
-interface SongDetails {
-  approved_by: string;
-  available: boolean;
-  description: string;
-  downloads: number;
-  end_loop_point: number;
-  game_banner_exists: boolean;
-  game_id: number;
-  game_name: string;
-  length: number;
-  loop_type: string;
+export interface Song {
+  id: number;
   name: string;
-  ok: boolean;
-  remix: boolean;
-  sample_rate: number;
-  size: number;
-  start_loop_point: number;
-  theme_type: string;
+  length: number;
+  loop: string;
   uploader: string;
+  available: boolean;
+  downloads: number;
+  game_name: string;
 }
 
 // Player state variables
@@ -97,27 +91,28 @@ export class BrstmPlayer {
     this._apiURL = apiURL;
     this._audio = document.createElement("audio");
     this._audio.id = PLAYER_TAG_ID;
-    this._audio.src =
-      "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
+    this._audio.src = SILENCE_URL;
     this._audio.loop = true;
     document.body.appendChild(this._audio);
   }
 
-  private getBrstmUrl(id: string): string {
-    return this._apiURL + "/brstm/" + id;
-  }
-
-  private getSongUrl(id: string): string {
-    return this._apiURL + "/json/song/" + id;
+  private getBrstmUrl(id: number): string {
+    return `${this._apiURL}/${id}`;
   }
 
   private _state: State;
   private _audio: HTMLAudioElement;
   private _apiURL: string;
-  private _song: SongDetails;
+  private _currentSong: Song;
+  private _currentIndex: number;
+  private _playlist: Song[] = [];
+  private _idsInPlaylist: Set<number> = new Set<number>();
 
   sendEvent(type: PlayerEvent, payload: object = {}) {
-    this._audio.dispatchEvent(new CustomEvent(type, { detail: payload }));
+    // dispatchEvent(new CustomEvent(type, { detail: payload }));
+    this._audio.dispatchEvent(
+      new CustomEvent(type, { detail: payload, bubbles: true })
+    );
   }
   sendUpdateStateEvent() {
     this.sendEvent(PlayerEvent.step, {
@@ -301,10 +296,24 @@ export class BrstmPlayer {
     this.sendUpdateStateEvent();
   }
   next() {
-    this.sendEvent(PlayerEvent.next);
+    this.movePlaylist(true);
   }
   previous() {
+    this.movePlaylist(false);
+  }
+  private movePlaylist(up = true) {
+    if (this.playlist.length === 0) {
+      return;
+    }
+    let idx = up
+      ? Math.min(this._currentIndex + 1, this._playlist.length - 1)
+      : Math.max(this._currentIndex - 1, 0);
+    if (idx === this._currentIndex) {
+      return;
+    }
     this.sendEvent(PlayerEvent.previous);
+    this._currentIndex = idx;
+    this.play(this.playlist[idx]);
   }
   playPause() {
     this._state.paused = !this._state.paused;
@@ -332,30 +341,57 @@ export class BrstmPlayer {
     this.sendEvent(PlayerEvent.stop);
   }
 
-  async fetchSongDetails(id: string): Promise<void> {
-    let resp = await fetch(this.getSongUrl(id));
-    if (resp.status >= 400) {
-      console.error(`could not fetch song details for id ${id}.`);
-      return;
-    }
-    this._song = await resp.json();
+  get currentSong(): Song {
+    return this._currentSong;
   }
 
-  async play(id: string) {
-    let url = this.getBrstmUrl(id);
+  get playlist(): Song[] {
+    return this._playlist;
+  }
+
+  addToPlaylist(song: Song) {
+    if (!song) {
+      return;
+    }
+    if (this._idsInPlaylist.has(song.id)) {
+      return;
+    }
+    this.sendEvent(PlayerEvent.playlistAdd, song);
+    this._playlist.push(song);
+    this._idsInPlaylist.add(song.id);
+  }
+
+  removeFromPlaylist(songId: number) {
+    this.sendEvent(PlayerEvent.playlistRemove, {
+      songId,
+    });
+    this._playlist = this._playlist.filter((s) => s.id !== songId);
+  }
+
+  clearPlaylist() {
+    this._playlist = [];
+  }
+
+  async init(song: Song) {
+    this.addToPlaylist(song);
+    this._currentIndex = 0;
+    await this.play(song);
+  }
+
+  async play(song: Song) {
+    this._currentSong = song;
+    let url = this.getBrstmUrl(song.id);
     this.sendEvent(PlayerEvent.play, {
-      id: id,
+      ...song,
       url: url,
     });
     this._state.capabilities = await browserCapabilities();
 
     // fetch details
-    this.fetchSongDetails(id).then((_) => {
-      this._setMediaSessionData();
-      if (this._state.capabilities.mediaSession) {
-        navigator.mediaSession.playbackState = "playing";
-      }
-    });
+    this._setMediaSessionData(song);
+    if (this._state.capabilities.mediaSession) {
+      navigator.mediaSession.playbackState = "playing";
+    }
 
     // Entry point to the
     this._state.stopped = false;
@@ -650,7 +686,7 @@ export class BrstmPlayer {
     );
   }
 
-  async _setMediaSessionData() {
+  async _setMediaSessionData(song: Song) {
     if (!this._state.capabilities.mediaSession) {
       return;
     }
@@ -659,12 +695,12 @@ export class BrstmPlayer {
       .play()
       .then((_) => {
         navigator.mediaSession.metadata = new MediaMetadata({
-          title: this._song.name,
-          album: this._song.game_name,
-          artist: this._song.uploader,
+          title: song.name,
+          album: song.game_name,
+          artist: song.uploader,
           artwork: [
             {
-              src: "https://ssb.wiki.gallery/images/a/a2/SSBU_spirit_Smash_Ball.png",
+              src: ARTWORK_URL,
               type: "image/png",
               sizes: "560x544",
             },
