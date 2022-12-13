@@ -30,6 +30,14 @@ export default class Resampler {
       );
     }
     this._inputBuffer = inputBuffer;
+
+    // initialize vars
+    this._outputBuffer = new Float32Array();
+    this._lastOutput = new Float32Array();
+    this._resampler = this.linerarInterpolationFn;
+    this._ratioWeight = 1;
+    this._lastWeight = 1;
+    this._tailExists = false;
     this.initialize();
   }
 
@@ -53,7 +61,7 @@ export default class Resampler {
                     as linear interpolation produces a gradient that we want
                     and works fine with two input sample points per output in this case.
                 */
-          this.compileLinearInterpolationFunction();
+          this._resampler = this.linerarInterpolationFn;
           this._lastWeight = 1;
         } else {
           /*
@@ -61,8 +69,8 @@ export default class Resampler {
                     like standard linear interpolation in high downsampling.
                     This is more accurate than linear interpolation on downsampling.
                 */
-          this.compileMultiTapFunction();
-          this.tailExists = false;
+          this._resampler = this.multiTapFn;
+          this._tailExists = false;
           this._lastWeight = 0;
         }
         this.initializeBuffers();
@@ -93,150 +101,108 @@ export default class Resampler {
   bypassResampler(upTo: number): number {
     return upTo;
   }
-  compileMultiTapFunction() {
-    var toCompile =
-      "var outputOffset = 0;\
-    if (bufferLength > 0) {\
-        var buffer = this._inputBuffer;\
-        var weight = 0;";
-    for (var channel = 0; channel < this._channels; ++channel) {
-      toCompile += "var output" + channel + " = 0;";
+  multiTapFn(bufferLength: number): number {
+    var outputOffset = 0;
+    if (bufferLength > 0) {
+      var buffer = this._inputBuffer;
+      var weight = 0;
+      var outputChannels: number[] = [];
+      for (var ch = 0; ch < this._channels; ++ch) {
+        outputChannels[0] = 0;
+      }
+      var actualPosition = 0;
+      var amountToNext = 0;
+      var alreadyProcessedTail = !this._tailExists;
+      this._tailExists = false;
+      var outputBuffer = this._outputBuffer;
+      var currentPosition = 0;
+      do {
+        if (alreadyProcessedTail) {
+          weight = this._ratioWeight;
+          outputChannels.forEach((_, i) => {
+            outputChannels[i] = 0;
+          });
+        } else {
+          weight = this._lastWeight;
+          outputChannels.forEach((_, i) => {
+            outputChannels[i] = this._lastOutput[i];
+          });
+          alreadyProcessedTail = true;
+        }
+        while (weight > 0 && actualPosition < bufferLength) {
+          amountToNext = 1 + actualPosition - currentPosition;
+          if (weight >= amountToNext) {
+            outputChannels.forEach((_, i) => {
+              outputChannels[i] += buffer[actualPosition++] * amountToNext;
+            });
+            currentPosition = actualPosition;
+            weight -= amountToNext;
+          } else {
+            outputChannels.forEach((_, i) => {
+              outputChannels[i] += buffer[actualPosition + i] * weight;
+            });
+            currentPosition += weight;
+            weight = 0;
+            break;
+          }
+        }
+        if (weight <= 0) {
+          outputChannels.forEach((out) => {
+            outputBuffer[outputOffset++] = out / this._ratioWeight;
+          });
+        } else {
+          this._lastWeight = weight;
+          outputChannels.forEach((out, i) => {
+            this._lastOutput[i] = out;
+          });
+          this._tailExists = true;
+          break;
+        }
+      } while (actualPosition < bufferLength);
     }
-    toCompile +=
-      "var actualPosition = 0;\
-        var amountToNext = 0;\
-        var alreadyProcessedTail = !this.tailExists;\
-        this._tailExists = false;\
-        var outputBuffer = this._outputBuffer;\
-        var currentPosition = 0;\
-        do {\
-            if (alreadyProcessedTail) {\
-                weight = " +
-      this._ratioWeight +
-      ";";
-    for (channel = 0; channel < this._channels; ++channel) {
-      toCompile += "output" + channel + " = 0;";
-    }
-    toCompile +=
-      "}\
-            else {\
-                weight = this._lastWeight;";
-    for (channel = 0; channel < this._channels; ++channel) {
-      toCompile += "output" + channel + " = this._lastOutput[" + channel + "];";
-    }
-    toCompile +=
-      "alreadyProcessedTail = true;\
-            }\
-            while (weight > 0 && actualPosition < bufferLength) {\
-                amountToNext = 1 + actualPosition - currentPosition;\
-                if (weight >= amountToNext) {";
-    for (channel = 0; channel < this._channels; ++channel) {
-      toCompile +=
-        "output" + channel + " += buffer[actualPosition++] * amountToNext;";
-    }
-    toCompile +=
-      "currentPosition = actualPosition;\
-                    weight -= amountToNext;\
-                }\
-                else {";
-    for (channel = 0; channel < this._channels; ++channel) {
-      toCompile +=
-        "output" +
-        channel +
-        " += buffer[actualPosition" +
-        (channel > 0 ? " + " + channel : "") +
-        "] * weight;";
-    }
-    toCompile +=
-      "currentPosition += weight;\
-                    weight = 0;\
-                    break;\
-                }\
-            }\
-            if (weight <= 0) {";
-    for (channel = 0; channel < this._channels; ++channel) {
-      toCompile +=
-        "outputBuffer[outputOffset++] = output" +
-        channel +
-        " / " +
-        this._ratioWeight +
-        ";";
-    }
-    toCompile +=
-      "}\
-            else {\
-                this._lastWeight = weight;";
-    for (channel = 0; channel < this._channels; ++channel) {
-      toCompile += "this._lastOutput[" + channel + "] = output" + channel + ";";
-    }
-    toCompile +=
-      "this._tailExists = true;\
-                break;\
-            }\
-        } while (actualPosition < bufferLength);\
-    }\
-    return outputOffset;";
-    this._resampler = Function("bufferLength", toCompile);
+    return outputOffset;
   }
-  compileLinearInterpolationFunction() {
-    var toCompile =
-      "var outputOffset = 0;\
-    if (bufferLength > 0) {\
-        var buffer = this._inputBuffer;\
-        var weight = this._lastWeight;\
-        var firstWeight = 0;\
-        var secondWeight = 0;\
-        var sourceOffset = 0;\
-        var outputOffset = 0;\
-        var outputBuffer = this._outputBuffer;\
-        for (; weight < 1; weight += " +
-      this._ratioWeight +
-      ") {\
-            secondWeight = weight % 1;\
-            firstWeight = 1 - secondWeight;";
-    for (var channel = 0; channel < this._channels; ++channel) {
-      toCompile +=
-        "outputBuffer[outputOffset++] = (this._lastOutput[" +
-        channel +
-        "] * firstWeight) + (buffer[" +
-        channel +
-        "] * secondWeight);";
+  linerarInterpolationFn(bufferLength: number) {
+    var outputOffset = 0;
+    if (bufferLength > 0) {
+      var buffer = this._inputBuffer;
+      var weight = this._lastWeight;
+      var firstWeight = 0;
+      var secondWeight = 0;
+      var sourceOffset = 0;
+      var outputOffset = 0;
+      var outputBuffer = this._outputBuffer;
+      for (; weight < 1; weight += this._ratioWeight) {
+        secondWeight = weight % 1;
+        firstWeight = 1 - secondWeight;
+        for (var ch = 0; ch < this._channels; ++ch) {
+          outputBuffer[outputOffset++] =
+            this._lastOutput[ch] * firstWeight + buffer[ch] * secondWeight;
+        }
+      }
+      weight -= 1;
+      for (
+        bufferLength -= this._channels,
+          sourceOffset = Math.floor(weight) * this._channels;
+        sourceOffset < bufferLength;
+
+      ) {
+        secondWeight = weight % 1;
+        firstWeight = 1 - secondWeight;
+        for (var ch = 0; ch < this._channels; ++ch) {
+          outputBuffer[outputOffset++] =
+            buffer[sourceOffset + ch] * firstWeight +
+            buffer[sourceOffset + ch + this._channels] * secondWeight;
+        }
+        weight += this._ratioWeight;
+        sourceOffset = Math.floor(weight) * this._channels;
+      }
+      for (var ch = 0; ch < this._channels; ++ch) {
+        this._lastOutput[ch] = buffer[sourceOffset++];
+      }
+      this._lastWeight = weight % 1;
     }
-    toCompile +=
-      "}\
-        weight -= 1;\
-        for (bufferLength -= " +
-      this._channels +
-      ", sourceOffset = Math.floor(weight) * " +
-      this._channels +
-      "; sourceOffset < bufferLength;) {\
-            secondWeight = weight % 1;\
-            firstWeight = 1 - secondWeight;";
-    for (var channel = 0; channel < this._channels; ++channel) {
-      toCompile +=
-        "outputBuffer[outputOffset++] = (buffer[sourceOffset" +
-        (channel > 0 ? " + " + channel : "") +
-        "] * firstWeight) + (buffer[sourceOffset + " +
-        (this._channels + channel) +
-        "] * secondWeight);";
-    }
-    toCompile +=
-      "weight += " +
-      this._ratioWeight +
-      ";\
-            sourceOffset = Math.floor(weight) * " +
-      this._channels +
-      ";\
-        }";
-    for (var channel = 0; channel < this._channels; ++channel) {
-      toCompile +=
-        "this._lastOutput[" + channel + "] = buffer[sourceOffset++];";
-    }
-    toCompile +=
-      "this._lastWeight = weight % 1;\
-    }\
-    return outputOffset;";
-    this._resampler = Function("bufferLength", toCompile);
+    return outputOffset;
   }
 
   get outputBuffer(): Float32Array | Float64Array {
@@ -256,5 +222,5 @@ export default class Resampler {
   private _resampler: Function;
   private _ratioWeight: number;
   private _lastWeight: number;
-  private tailExists: boolean;
+  private _tailExists: boolean;
 }
