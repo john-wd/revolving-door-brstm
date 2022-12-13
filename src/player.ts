@@ -8,7 +8,7 @@ import { sleep, awaitMessage } from "./util";
 import { Brstm } from "brstm";
 import { PlayerEvent } from "./eventTypes";
 
-function partitionedGetSamples(brstm, start, size) {
+function partitionedGetSamples(brstm: Brstm, start: number, size: number) {
   let samples = [];
   let got = 0;
   for (let i = 0; i < brstm.metadata.numberChannels; i++) {
@@ -38,11 +38,7 @@ const ARTWORK_URL =
 export interface Song {
   id: number;
   name: string;
-  length: number;
-  loop: string;
   uploader: string;
-  available: boolean;
-  downloads: number;
   game_name: string;
 }
 
@@ -71,15 +67,15 @@ export class BrstmPlayer {
   constructor(apiURL: string = SMASHCUSTOMMUSIC_URL) {
     this._state = {
       hasInitialized: false,
-      capabilities: null,
-      audioContext: null,
-      scriptNode: null,
-      gainNode: null,
+      capabilities: {} as Capabilities,
+      audioContext: new AudioContext(),
+      scriptNode: {} as ScriptProcessorNode,
+      gainNode: {} as GainNode,
       fullyLoaded: true,
       loadState: 0,
       playbackCurrentSample: 0,
-      brstm: null,
-      brstmBuffer: null,
+      brstm: {} as Brstm,
+      brstmBuffer: new ArrayBuffer(0),
       paused: false,
       stopped: false,
       enableLoop: false,
@@ -93,6 +89,8 @@ export class BrstmPlayer {
     this._audio.id = PLAYER_TAG_ID;
     this._audio.src = SILENCE_URL;
     this._audio.loop = true;
+    this._currentSong = {} as Song;
+    this._currentIndex = -1;
     document.body.appendChild(this._audio);
   }
 
@@ -152,13 +150,18 @@ export class BrstmPlayer {
       let reader: ReadableStreamDefaultReader;
       try {
         resp = await fetch(url);
-        reader = (await resp.body).getReader(); // Initialize reader
+        let body = await resp.body;
+        if (!body) throw "could not read body";
+
+        reader = body.getReader(); // Initialize reader
+
+        let length = resp.headers.get("content-length");
+        if (!length) throw "could not read content-length header";
+        this._state.brstmBuffer = new ArrayBuffer(parseInt(length));
       } catch (e) {
         return reject(e);
       }
-      this._state.brstmBuffer = new ArrayBuffer(
-        parseInt(resp.headers.get("content-length"))
-      );
+
       let bufferView = new Uint8Array(this._state.brstmBuffer); // Create shared memory view
       let writeOffset = 0; // How much we read
       let resolved = false; // Did we resolve the promise already
@@ -178,7 +181,7 @@ export class BrstmPlayer {
               ready: true,
             });
             await this._state.audioContext.close();
-            this._state.audioContext = null;
+            this._state.audioContext = {} as AudioContext;
           } else {
             reject(e);
           }
@@ -413,7 +416,7 @@ export class BrstmPlayer {
     if (this._state.audioContext) {
       // We have a previous audio context, we need to murderize it
       await this._state.audioContext.close();
-      this._state.audioContext = null;
+      this._state.audioContext = {} as AudioContext;
     }
 
     this._state.playbackCurrentSample = 0; // Set the state for playback

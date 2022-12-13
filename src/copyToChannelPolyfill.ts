@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * This function serves as an override to AudioBuffer.copyToChannel in order to
  * make the library more compatible between browsers.

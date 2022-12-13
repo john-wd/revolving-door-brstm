@@ -3,26 +3,6 @@
 
     class GestureEngine {
         constructor() {
-            this.registerOpEvent = function (element, cb) {
-                if (this.operationListeners.has(element)) {
-                    let z = this.operationListeners.get(element);
-                    z.push(cb);
-                    this.operationListeners.set(element, z);
-                }
-                else {
-                    this.operationListeners.set(element, [cb]);
-                }
-            };
-            this.registerFinEvent = function (element, cb) {
-                if (this.finishedListeners.has(element)) {
-                    let z = this.finishedListeners.get(element);
-                    z.push(cb);
-                    this.finishedListeners.set(element, z);
-                }
-                else {
-                    this.finishedListeners.set(element, [cb]);
-                }
-            };
             this.currentlyGesturing = false;
             this.activeArea = "";
             this.activeAreaElem = null;
@@ -45,16 +25,44 @@
         }
         fireOp(e, x, y) {
             if (this.operationListeners.has(e)) {
-                for (let i = 0; i < this.operationListeners.get(e).length; i++) {
-                    this.operationListeners.get(e)[i](x, y);
-                }
+                let listeners = this.operationListeners.get(e);
+                if (listeners)
+                    listeners.forEach((op) => {
+                        op(x, y);
+                    });
             }
         }
         fireFin(e, x, y) {
             if (this.finishedListeners.has(e)) {
-                for (let i = 0; i < this.finishedListeners.get(e).length; i++) {
-                    this.finishedListeners.get(e)[i](x, y);
+                let listeners = this.operationListeners.get(e);
+                if (listeners)
+                    listeners.forEach((fin) => {
+                        fin(x, y);
+                    });
+            }
+        }
+        registerOpEvent(element, cb) {
+            if (this.operationListeners.has(element)) {
+                let z = this.operationListeners.get(element);
+                if (z) {
+                    z.push(cb);
+                    this.operationListeners.set(element, z);
                 }
+            }
+            else {
+                this.operationListeners.set(element, [cb]);
+            }
+        }
+        registerFinEvent(element, cb) {
+            if (this.finishedListeners.has(element)) {
+                let z = this.finishedListeners.get(element);
+                if (z) {
+                    z.push(cb);
+                    this.finishedListeners.set(element, z);
+                }
+            }
+            else {
+                this.finishedListeners.set(element, [cb]);
             }
         }
         runGestureEngine() {
@@ -480,6 +488,7 @@
 
     var gui = /*@__PURE__*/getAugmentedNamespace(gui$1);
 
+    // @ts-nocheck
     /**
      * This function serves as an override to AudioBuffer.copyToChannel in order to
      * make the library more compatible between browsers.
@@ -512,6 +521,13 @@
                 throw new Error("inputBuffer is not an array or a float32 or a float64 array.");
             }
             this._inputBuffer = inputBuffer;
+            // initialize vars
+            this._outputBuffer = new Float32Array();
+            this._lastOutput = new Float32Array();
+            this._resampler = this.linerarInterpolationFn;
+            this._ratioWeight = 1;
+            this._lastWeight = 1;
+            this._tailExists = false;
             this.initialize();
         }
         initialize() {
@@ -533,7 +549,7 @@
                                   as linear interpolation produces a gradient that we want
                                   and works fine with two input sample points per output in this case.
                               */
-                        this.compileLinearInterpolationFunction();
+                        this._resampler = this.linerarInterpolationFn;
                         this._lastWeight = 1;
                     }
                     else {
@@ -542,8 +558,8 @@
                                   like standard linear interpolation in high downsampling.
                                   This is more accurate than linear interpolation on downsampling.
                               */
-                        this.compileMultiTapFunction();
-                        this.tailExists = false;
+                        this._resampler = this.multiTapFn;
+                        this._tailExists = false;
                         this._lastWeight = 0;
                     }
                     this.initializeBuffers();
@@ -573,148 +589,107 @@
         bypassResampler(upTo) {
             return upTo;
         }
-        compileMultiTapFunction() {
-            var toCompile = "var outputOffset = 0;\
-    if (bufferLength > 0) {\
-        var buffer = this._inputBuffer;\
-        var weight = 0;";
-            for (var channel = 0; channel < this._channels; ++channel) {
-                toCompile += "var output" + channel + " = 0;";
+        multiTapFn(bufferLength) {
+            var outputOffset = 0;
+            if (bufferLength > 0) {
+                var buffer = this._inputBuffer;
+                var weight = 0;
+                var outputChannels = [];
+                for (var ch = 0; ch < this._channels; ++ch) {
+                    outputChannels[0] = 0;
+                }
+                var actualPosition = 0;
+                var amountToNext = 0;
+                var alreadyProcessedTail = !this._tailExists;
+                this._tailExists = false;
+                var outputBuffer = this._outputBuffer;
+                var currentPosition = 0;
+                do {
+                    if (alreadyProcessedTail) {
+                        weight = this._ratioWeight;
+                        outputChannels.forEach((_, i) => {
+                            outputChannels[i] = 0;
+                        });
+                    }
+                    else {
+                        weight = this._lastWeight;
+                        outputChannels.forEach((_, i) => {
+                            outputChannels[i] = this._lastOutput[i];
+                        });
+                        alreadyProcessedTail = true;
+                    }
+                    while (weight > 0 && actualPosition < bufferLength) {
+                        amountToNext = 1 + actualPosition - currentPosition;
+                        if (weight >= amountToNext) {
+                            outputChannels.forEach((_, i) => {
+                                outputChannels[i] += buffer[actualPosition++] * amountToNext;
+                            });
+                            currentPosition = actualPosition;
+                            weight -= amountToNext;
+                        }
+                        else {
+                            outputChannels.forEach((_, i) => {
+                                outputChannels[i] += buffer[actualPosition + i] * weight;
+                            });
+                            currentPosition += weight;
+                            weight = 0;
+                            break;
+                        }
+                    }
+                    if (weight <= 0) {
+                        outputChannels.forEach((out) => {
+                            outputBuffer[outputOffset++] = out / this._ratioWeight;
+                        });
+                    }
+                    else {
+                        this._lastWeight = weight;
+                        outputChannels.forEach((out, i) => {
+                            this._lastOutput[i] = out;
+                        });
+                        this._tailExists = true;
+                        break;
+                    }
+                } while (actualPosition < bufferLength);
             }
-            toCompile +=
-                "var actualPosition = 0;\
-        var amountToNext = 0;\
-        var alreadyProcessedTail = !this.tailExists;\
-        this._tailExists = false;\
-        var outputBuffer = this._outputBuffer;\
-        var currentPosition = 0;\
-        do {\
-            if (alreadyProcessedTail) {\
-                weight = " +
-                    this._ratioWeight +
-                    ";";
-            for (channel = 0; channel < this._channels; ++channel) {
-                toCompile += "output" + channel + " = 0;";
-            }
-            toCompile +=
-                "}\
-            else {\
-                weight = this._lastWeight;";
-            for (channel = 0; channel < this._channels; ++channel) {
-                toCompile += "output" + channel + " = this._lastOutput[" + channel + "];";
-            }
-            toCompile +=
-                "alreadyProcessedTail = true;\
-            }\
-            while (weight > 0 && actualPosition < bufferLength) {\
-                amountToNext = 1 + actualPosition - currentPosition;\
-                if (weight >= amountToNext) {";
-            for (channel = 0; channel < this._channels; ++channel) {
-                toCompile +=
-                    "output" + channel + " += buffer[actualPosition++] * amountToNext;";
-            }
-            toCompile +=
-                "currentPosition = actualPosition;\
-                    weight -= amountToNext;\
-                }\
-                else {";
-            for (channel = 0; channel < this._channels; ++channel) {
-                toCompile +=
-                    "output" +
-                        channel +
-                        " += buffer[actualPosition" +
-                        (channel > 0 ? " + " + channel : "") +
-                        "] * weight;";
-            }
-            toCompile +=
-                "currentPosition += weight;\
-                    weight = 0;\
-                    break;\
-                }\
-            }\
-            if (weight <= 0) {";
-            for (channel = 0; channel < this._channels; ++channel) {
-                toCompile +=
-                    "outputBuffer[outputOffset++] = output" +
-                        channel +
-                        " / " +
-                        this._ratioWeight +
-                        ";";
-            }
-            toCompile +=
-                "}\
-            else {\
-                this._lastWeight = weight;";
-            for (channel = 0; channel < this._channels; ++channel) {
-                toCompile += "this._lastOutput[" + channel + "] = output" + channel + ";";
-            }
-            toCompile +=
-                "this._tailExists = true;\
-                break;\
-            }\
-        } while (actualPosition < bufferLength);\
-    }\
-    return outputOffset;";
-            this._resampler = Function("bufferLength", toCompile);
+            return outputOffset;
         }
-        compileLinearInterpolationFunction() {
-            var toCompile = "var outputOffset = 0;\
-    if (bufferLength > 0) {\
-        var buffer = this._inputBuffer;\
-        var weight = this._lastWeight;\
-        var firstWeight = 0;\
-        var secondWeight = 0;\
-        var sourceOffset = 0;\
-        var outputOffset = 0;\
-        var outputBuffer = this._outputBuffer;\
-        for (; weight < 1; weight += " +
-                this._ratioWeight +
-                ") {\
-            secondWeight = weight % 1;\
-            firstWeight = 1 - secondWeight;";
-            for (var channel = 0; channel < this._channels; ++channel) {
-                toCompile +=
-                    "outputBuffer[outputOffset++] = (this._lastOutput[" +
-                        channel +
-                        "] * firstWeight) + (buffer[" +
-                        channel +
-                        "] * secondWeight);";
+        linerarInterpolationFn(bufferLength) {
+            var outputOffset = 0;
+            if (bufferLength > 0) {
+                var buffer = this._inputBuffer;
+                var weight = this._lastWeight;
+                var firstWeight = 0;
+                var secondWeight = 0;
+                var sourceOffset = 0;
+                var outputOffset = 0;
+                var outputBuffer = this._outputBuffer;
+                for (; weight < 1; weight += this._ratioWeight) {
+                    secondWeight = weight % 1;
+                    firstWeight = 1 - secondWeight;
+                    for (var ch = 0; ch < this._channels; ++ch) {
+                        outputBuffer[outputOffset++] =
+                            this._lastOutput[ch] * firstWeight + buffer[ch] * secondWeight;
+                    }
+                }
+                weight -= 1;
+                for (bufferLength -= this._channels,
+                    sourceOffset = Math.floor(weight) * this._channels; sourceOffset < bufferLength;) {
+                    secondWeight = weight % 1;
+                    firstWeight = 1 - secondWeight;
+                    for (var ch = 0; ch < this._channels; ++ch) {
+                        outputBuffer[outputOffset++] =
+                            buffer[sourceOffset + ch] * firstWeight +
+                                buffer[sourceOffset + ch + this._channels] * secondWeight;
+                    }
+                    weight += this._ratioWeight;
+                    sourceOffset = Math.floor(weight) * this._channels;
+                }
+                for (var ch = 0; ch < this._channels; ++ch) {
+                    this._lastOutput[ch] = buffer[sourceOffset++];
+                }
+                this._lastWeight = weight % 1;
             }
-            toCompile +=
-                "}\
-        weight -= 1;\
-        for (bufferLength -= " +
-                    this._channels +
-                    ", sourceOffset = Math.floor(weight) * " +
-                    this._channels +
-                    "; sourceOffset < bufferLength;) {\
-            secondWeight = weight % 1;\
-            firstWeight = 1 - secondWeight;";
-            for (var channel = 0; channel < this._channels; ++channel) {
-                toCompile +=
-                    "outputBuffer[outputOffset++] = (buffer[sourceOffset" +
-                        (channel > 0 ? " + " + channel : "") +
-                        "] * firstWeight) + (buffer[sourceOffset + " +
-                        (this._channels + channel) +
-                        "] * secondWeight);";
-            }
-            toCompile +=
-                "weight += " +
-                    this._ratioWeight +
-                    ";\
-            sourceOffset = Math.floor(weight) * " +
-                    this._channels +
-                    ";\
-        }";
-            for (var channel = 0; channel < this._channels; ++channel) {
-                toCompile +=
-                    "this._lastOutput[" + channel + "] = buffer[sourceOffset++];";
-            }
-            toCompile +=
-                "this._lastWeight = weight % 1;\
-    }\
-    return outputOffset;";
-            this._resampler = Function("bufferLength", toCompile);
+            return outputOffset;
         }
         get outputBuffer() {
             return this._outputBuffer;
@@ -826,6 +801,9 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
                 let u = URL.createObjectURL(blob);
                 let resp = yield fetch(u);
                 let body = yield resp.body;
+                if (!body) {
+                    throw "could not get body";
+                }
                 const reader = body.getReader();
                 while (true) {
                     let d = yield reader.read();
@@ -1349,15 +1327,15 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
             this._idsInPlaylist = new Set();
             this._state = {
                 hasInitialized: false,
-                capabilities: null,
-                audioContext: null,
-                scriptNode: null,
-                gainNode: null,
+                capabilities: {},
+                audioContext: new AudioContext(),
+                scriptNode: {},
+                gainNode: {},
                 fullyLoaded: true,
                 loadState: 0,
                 playbackCurrentSample: 0,
-                brstm: null,
-                brstmBuffer: null,
+                brstm: {},
+                brstmBuffer: new ArrayBuffer(0),
                 paused: false,
                 stopped: false,
                 enableLoop: false,
@@ -1371,6 +1349,8 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
             this._audio.id = PLAYER_TAG_ID;
             this._audio.src = SILENCE_URL;
             this._audio.loop = true;
+            this._currentSong = {};
+            this._currentIndex = -1;
             document.body.appendChild(this._audio);
         }
         getBrstmUrl(id) {
@@ -1411,12 +1391,18 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
                 let reader;
                 try {
                     resp = yield fetch(url);
-                    reader = (yield resp.body).getReader(); // Initialize reader
+                    let body = yield resp.body;
+                    if (!body)
+                        throw "could not read body";
+                    reader = body.getReader(); // Initialize reader
+                    let length = resp.headers.get("content-length");
+                    if (!length)
+                        throw "could not read content-length header";
+                    this._state.brstmBuffer = new ArrayBuffer(parseInt(length));
                 }
                 catch (e) {
                     return reject(e);
                 }
-                this._state.brstmBuffer = new ArrayBuffer(parseInt(resp.headers.get("content-length")));
                 let bufferView = new Uint8Array(this._state.brstmBuffer); // Create shared memory view
                 let writeOffset = 0; // How much we read
                 let resolved = false; // Did we resolve the promise already
@@ -1437,7 +1423,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
                                 ready: true,
                             });
                             yield this._state.audioContext.close();
-                            this._state.audioContext = null;
+                            this._state.audioContext = {};
                         }
                         else {
                             reject(e);
@@ -1657,7 +1643,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
                 if (this._state.audioContext) {
                     // We have a previous audio context, we need to murderize it
                     yield this._state.audioContext.close();
-                    this._state.audioContext = null;
+                    this._state.audioContext = {};
                 }
                 this._state.playbackCurrentSample = 0; // Set the state for playback
                 this._state.paused = false; // Unpause it

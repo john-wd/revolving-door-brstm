@@ -13,10 +13,10 @@ class GestureEngine {
   public activeArea;
   public activeAreaElem: any;
 
-  public operationListeners: Map<string, listernerFn>;
-  public finishedListeners: Map<string, listernerFn>;
+  public operationListeners: Map<string, listernerFn[]>;
+  public finishedListeners: Map<string, listernerFn[]>;
 
-  public sanitize(x, y) {
+  public sanitize(x: number, y: number) {
     let bcr = this.activeAreaElem.getBoundingClientRect();
 
     let xx = x - bcr.x;
@@ -30,41 +30,49 @@ class GestureEngine {
     return [xx, yy];
   }
 
-  public fireOp(e, x, y) {
+  public fireOp(e: string, x: number, y: number) {
     if (this.operationListeners.has(e)) {
-      for (let i = 0; i < this.operationListeners.get(e).length; i++) {
-        this.operationListeners.get(e)[i](x, y);
-      }
+      let listeners = this.operationListeners.get(e);
+      if (listeners)
+        listeners.forEach((op) => {
+          op(x, y);
+        });
     }
   }
 
-  public fireFin(e, x, y) {
+  public fireFin(e: string, x: number, y: number) {
     if (this.finishedListeners.has(e)) {
-      for (let i = 0; i < this.finishedListeners.get(e).length; i++) {
-        this.finishedListeners.get(e)[i](x, y);
-      }
+      let listeners = this.operationListeners.get(e);
+      if (listeners)
+        listeners.forEach((fin) => {
+          fin(x, y);
+        });
     }
   }
 
-  registerOpEvent = function (element, cb) {
+  public registerOpEvent(element: string, cb: listernerFn) {
     if (this.operationListeners.has(element)) {
       let z = this.operationListeners.get(element);
-      z.push(cb);
-      this.operationListeners.set(element, z);
+      if (z) {
+        z.push(cb);
+        this.operationListeners.set(element, z);
+      }
     } else {
       this.operationListeners.set(element, [cb]);
     }
-  };
+  }
 
-  registerFinEvent = function (element, cb) {
+  public registerFinEvent(element: string, cb: listernerFn) {
     if (this.finishedListeners.has(element)) {
       let z = this.finishedListeners.get(element);
-      z.push(cb);
-      this.finishedListeners.set(element, z);
+      if (z) {
+        z.push(cb);
+        this.finishedListeners.set(element, z);
+      }
     } else {
       this.finishedListeners.set(element, [cb]);
     }
-  };
+  }
 
   runGestureEngine() {
     runGestureEngine();

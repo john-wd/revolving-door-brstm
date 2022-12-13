@@ -33,6 +33,9 @@ export async function browserCapabilities(): Promise<Capabilities> {
     let u = URL.createObjectURL(blob);
     let resp = await fetch(u);
     let body = await resp.body;
+    if (!body) {
+      throw "could not get body";
+    }
     const reader = body.getReader();
 
     while (true) {
