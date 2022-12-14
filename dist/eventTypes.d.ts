@@ -1,0 +1,20 @@
+export declare enum PlayerEvent {
+    start = "brstm_start",
+    play = "brstm_play",
+    pause = "brstm_pause",
+    playPause = "brstm_playpause",
+    stop = "brstm_stop",
+    next = "brstm_next",
+    previous = "brstm_previous",
+    seek = "brstm_seek",
+    setLoop = "brstm_setloop",
+    setVolume = "brstm_setvolume",
+    buffering = "brstm_buffering",
+    loading = "brstm_loading",
+    loaded = "brstm_loaded",
+    killed = "brstm_killed",
+    step = "brstm_step",
+    resetState = "brstm_resetstate",
+    playlistAdd = "brstm_playlist_add",
+    playlistRemove = "brstm_playlist_remove"
+}

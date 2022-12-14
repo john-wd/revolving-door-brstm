@@ -1,0 +1,24 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PlayerEvent = void 0;
+var PlayerEvent;
+(function (PlayerEvent) {
+    PlayerEvent["start"] = "brstm_start";
+    PlayerEvent["play"] = "brstm_play";
+    PlayerEvent["pause"] = "brstm_pause";
+    PlayerEvent["playPause"] = "brstm_playpause";
+    PlayerEvent["stop"] = "brstm_stop";
+    PlayerEvent["next"] = "brstm_next";
+    PlayerEvent["previous"] = "brstm_previous";
+    PlayerEvent["seek"] = "brstm_seek";
+    PlayerEvent["setLoop"] = "brstm_setloop";
+    PlayerEvent["setVolume"] = "brstm_setvolume";
+    PlayerEvent["buffering"] = "brstm_buffering";
+    PlayerEvent["loading"] = "brstm_loading";
+    PlayerEvent["loaded"] = "brstm_loaded";
+    PlayerEvent["killed"] = "brstm_killed";
+    PlayerEvent["step"] = "brstm_step";
+    PlayerEvent["resetState"] = "brstm_resetstate";
+    PlayerEvent["playlistAdd"] = "brstm_playlist_add";
+    PlayerEvent["playlistRemove"] = "brstm_playlist_remove";
+})(PlayerEvent = exports.PlayerEvent || (exports.PlayerEvent = {}));

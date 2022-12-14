@@ -3,14 +3,14 @@ import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 
 export default {
-  input: "built/index.js",
+  input: "dist/index.js",
   output: [
     {
-      file: "dist/bundle.js",
+      file: "bundle/bundle.js",
       format: "iife",
     },
     {
-      file: "dist/bundle.min.js",
+      file: "bundle/bundle.min.js",
       format: "iife",
       plugins: [terser()],
     },
