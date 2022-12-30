@@ -231,6 +231,21 @@ class BrstmPlayer {
             }
         }));
     }
+    get totalSamples() {
+        return this._state.brstm ? this._state.brstm.metadata.totalSamples : -1;
+    }
+    get sampleRate() {
+        return this._state.brstm ? this._state.brstm.metadata.sampleRate : -1;
+    }
+    getSongLength() {
+        return this.totalSamples / this.sampleRate;
+    }
+    playAtIndex(idx) {
+        if (idx <= this.playlist.length) {
+            this._currentIndex = idx;
+            this.play(this._playlist[idx]);
+        }
+    }
     setVolume(level) {
         this._state.volume = level;
         this.sendEvent(eventTypes_1.PlayerEvent.setVolume, {

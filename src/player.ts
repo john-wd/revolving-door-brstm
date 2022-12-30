@@ -273,6 +273,25 @@ export class BrstmPlayer {
     });
   }
 
+  get totalSamples(): number {
+    return this._state.brstm ? this._state.brstm.metadata.totalSamples : -1;
+  }
+
+  get sampleRate(): number {
+    return this._state.brstm ? this._state.brstm.metadata.sampleRate : -1;
+  }
+
+  getSongLength(): number {
+    return this.totalSamples / this.sampleRate;
+  }
+
+  playAtIndex(idx: number) {
+    if (idx <= this.playlist.length) {
+      this._currentIndex = idx;
+      this.play(this._playlist[idx]);
+    }
+  }
+
   setVolume(level: number) {
     this._state.volume = level;
     this.sendEvent(PlayerEvent.setVolume, {

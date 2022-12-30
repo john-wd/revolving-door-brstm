@@ -20,6 +20,10 @@ export declare class BrstmPlayer {
     private getResampledSample;
     private loadSongLegacy;
     private loadSongStreaming;
+    get totalSamples(): number;
+    get sampleRate(): number;
+    getSongLength(): number;
+    playAtIndex(idx: number): void;
     setVolume(level: number): void;
     incVolume(step: number): void;
     decVolume(step: number): void;
