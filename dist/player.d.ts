@@ -1,6 +1,6 @@
 import { PlayerEvent } from "./eventTypes";
 export interface Song {
-    id: number;
+    song_id: number;
     name: string;
     uploader: string;
     game_name: string;
@@ -35,11 +35,11 @@ export declare class BrstmPlayer {
     setLoop(enable: boolean): void;
     stop(): void;
     get currentSong(): Song;
+    get currentIndex(): number;
     get playlist(): Song[];
     addToPlaylist(song: Song): void;
     removeFromPlaylist(songId: number): void;
     clearPlaylist(): void;
-    init(song: Song): Promise<void>;
     play(song: Song): Promise<void>;
     _setMediaSessionData(song: Song): Promise<void>;
 }

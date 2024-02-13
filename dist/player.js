@@ -37,11 +37,8 @@ function partitionedGetSamples(brstm, start, size) {
     }
     return samples;
 }
-const SMASHCUSTOMMUSIC_URL = "https://smashcustommusic.net";
-const SILENCE_URL = "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
-const ARTWORK_URL = "https://ssb.wiki.gallery/images/a/a2/SSBU_spirit_Smash_Ball.png";
 class BrstmPlayer {
-    constructor(apiURL = SMASHCUSTOMMUSIC_URL) {
+    constructor(apiURL = configProvider_1.SMASHCUSTOMMUSIC_URL) {
         this._playlist = [];
         this._idsInPlaylist = new Set();
         this._state = {
@@ -66,7 +63,7 @@ class BrstmPlayer {
         this._apiURL = apiURL;
         this._audio = document.createElement("audio");
         this._audio.id = configProvider_1.PLAYER_TAG_ID;
-        this._audio.src = SILENCE_URL;
+        this._audio.src = configProvider_1.SILENCE_URL;
         this._audio.loop = true;
         this._currentSong = {};
         this._currentIndex = -1;
@@ -316,6 +313,9 @@ class BrstmPlayer {
     get currentSong() {
         return this._currentSong;
     }
+    get currentIndex() {
+        return this._currentIndex;
+    }
     get playlist() {
         return this._playlist;
     }
@@ -323,33 +323,26 @@ class BrstmPlayer {
         if (!song) {
             return;
         }
-        if (this._idsInPlaylist.has(song.id)) {
+        if (this._idsInPlaylist.has(song.song_id)) {
             return;
         }
         this.sendEvent(eventTypes_1.PlayerEvent.playlistAdd, song);
         this._playlist.push(song);
-        this._idsInPlaylist.add(song.id);
+        this._idsInPlaylist.add(song.song_id);
     }
     removeFromPlaylist(songId) {
         this.sendEvent(eventTypes_1.PlayerEvent.playlistRemove, {
             songId,
         });
-        this._playlist = this._playlist.filter((s) => s.id !== songId);
+        this._playlist = this._playlist.filter((s) => s.song_id !== songId);
     }
     clearPlaylist() {
         this._playlist = [];
     }
-    init(song) {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.addToPlaylist(song);
-            this._currentIndex = 0;
-            yield this.play(song);
-        });
-    }
     play(song) {
         return __awaiter(this, void 0, void 0, function* () {
             this._currentSong = song;
-            let url = this.getBrstmUrl(song.id);
+            let url = this.getBrstmUrl(song.song_id);
             this.sendEvent(eventTypes_1.PlayerEvent.play, Object.assign(Object.assign({}, song), { url: url }));
             this._state.capabilities = yield (0, browserCapabilities_1.browserCapabilities)();
             // fetch details
@@ -582,7 +575,7 @@ class BrstmPlayer {
                     artist: song.uploader,
                     artwork: [
                         {
-                            src: ARTWORK_URL,
+                            src: configProvider_1.ARTWORK_URL,
                             type: "image/png",
                             sizes: "560x544",
                         },

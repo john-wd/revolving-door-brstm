@@ -1,5 +1,5 @@
 // This script shouldn't do anything without explicit user interaction (Triggering playback)
-import { STREAMING_MIN_RESPONSE, PLAYER_TAG_ID } from "./configProvider";
+import { STREAMING_MIN_RESPONSE, PLAYER_TAG_ID, ARTWORK_URL, SILENCE_URL, SMASHCUSTOMMUSIC_URL } from "./configProvider";
 import copyToChannelPolyfill from "./copyToChannelPolyfill";
 import resampler from "./resampler";
 import unlock from "./webAudioUnlock";
@@ -29,14 +29,8 @@ function partitionedGetSamples(brstm: Brstm, start: number, size: number) {
   return samples;
 }
 
-const SMASHCUSTOMMUSIC_URL = "https://smashcustommusic.net";
-const SILENCE_URL =
-  "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
-const ARTWORK_URL =
-  "https://ssb.wiki.gallery/images/a/a2/SSBU_spirit_Smash_Ball.png";
-
 export interface Song {
-  id: number;
+  song_id: number;
   name: string;
   uploader: string;
   game_name: string;
@@ -248,8 +242,8 @@ export class BrstmPlayer {
             this._state.samplesReady =
               Math.floor(
                 (this._state.loadState - brstmHeaderSize) /
-                  this._state.brstm.metadata.numberChannels /
-                  this._state.brstm.metadata.blockSize
+                this._state.brstm.metadata.numberChannels /
+                this._state.brstm.metadata.blockSize
               ) * this._state.brstm.metadata.samplesPerBlock;
           }
         } else {
@@ -367,6 +361,10 @@ export class BrstmPlayer {
     return this._currentSong;
   }
 
+  get currentIndex(): number {
+    return this._currentIndex
+  }
+
   get playlist(): Song[] {
     return this._playlist;
   }
@@ -375,34 +373,28 @@ export class BrstmPlayer {
     if (!song) {
       return;
     }
-    if (this._idsInPlaylist.has(song.id)) {
+    if (this._idsInPlaylist.has(song.song_id)) {
       return;
     }
     this.sendEvent(PlayerEvent.playlistAdd, song);
     this._playlist.push(song);
-    this._idsInPlaylist.add(song.id);
+    this._idsInPlaylist.add(song.song_id);
   }
 
   removeFromPlaylist(songId: number) {
     this.sendEvent(PlayerEvent.playlistRemove, {
       songId,
     });
-    this._playlist = this._playlist.filter((s) => s.id !== songId);
+    this._playlist = this._playlist.filter((s) => s.song_id !== songId);
   }
 
   clearPlaylist() {
     this._playlist = [];
   }
 
-  async init(song: Song) {
-    this.addToPlaylist(song);
-    this._currentIndex = 0;
-    await this.play(song);
-  }
-
   async play(song: Song) {
     this._currentSong = song;
-    let url = this.getBrstmUrl(song.id);
+    let url = this.getBrstmUrl(song.song_id);
     this.sendEvent(PlayerEvent.play, {
       ...song,
       url: url,
@@ -499,10 +491,10 @@ export class BrstmPlayer {
     bufferSize = this._state.capabilities.sampleRate
       ? bufferSize
       : this.getResampledSample(
-          this._state.audioContext.sampleRate,
-          this._state.brstm.metadata.sampleRate,
-          bufferSize
-        );
+        this._state.audioContext.sampleRate,
+        this._state.brstm.metadata.sampleRate,
+        bufferSize
+      );
     let loadBufferSize = bufferSize;
 
     // If we resample, we need to also fetch some extra samples to prevent audio glitches
@@ -587,14 +579,14 @@ export class BrstmPlayer {
             this._state.brstm,
             this._state.playbackCurrentSample,
             this._state.brstm.metadata.totalSamples -
-              this._state.playbackCurrentSample
+            this._state.playbackCurrentSample
           );
 
           let endSamplesLength = samples[0].length;
 
           console.log(
             this._state.brstm.metadata.totalSamples -
-              this._state.playbackCurrentSample,
+            this._state.playbackCurrentSample,
             loadBufferSize - endSamplesLength
           );
 
@@ -625,8 +617,8 @@ export class BrstmPlayer {
             this._state.brstm,
             this._state.playbackCurrentSample,
             this._state.brstm.metadata.totalSamples -
-              this._state.playbackCurrentSample -
-              1
+            this._state.playbackCurrentSample -
+            1
           );
 
           // Fill remaining space in the buffer with 0

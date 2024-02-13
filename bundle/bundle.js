@@ -10,9 +10,12 @@
 
 	var configProvider = createCommonjsModule(function (module, exports) {
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.PLAYER_TAG_ID = exports.STREAMING_MIN_RESPONSE = void 0;
+	exports.ARTWORK_URL = exports.SILENCE_URL = exports.SMASHCUSTOMMUSIC_URL = exports.PLAYER_TAG_ID = exports.STREAMING_MIN_RESPONSE = void 0;
 	exports.STREAMING_MIN_RESPONSE = Math.pow(2, 19);
 	exports.PLAYER_TAG_ID = "brstm_player";
+	exports.SMASHCUSTOMMUSIC_URL = "https://smashcustommusic.net";
+	exports.SILENCE_URL = "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
+	exports.ARTWORK_URL = "https://ssb.wiki.gallery/images/a/a2/SSBU_spirit_Smash_Ball.png";
 	});
 
 	// @ts-nocheck
@@ -470,11 +473,8 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	    }
 	    return samples;
 	}
-	const SMASHCUSTOMMUSIC_URL = "https://smashcustommusic.net";
-	const SILENCE_URL = "https://github.com/anars/blank-audio/blob/master/5-seconds-of-silence.mp3?raw=true";
-	const ARTWORK_URL = "https://ssb.wiki.gallery/images/a/a2/SSBU_spirit_Smash_Ball.png";
 	class BrstmPlayer {
-	    constructor(apiURL = SMASHCUSTOMMUSIC_URL) {
+	    constructor(apiURL = configProvider.SMASHCUSTOMMUSIC_URL) {
 	        this._playlist = [];
 	        this._idsInPlaylist = new Set();
 	        this._state = {
@@ -499,7 +499,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	        this._apiURL = apiURL;
 	        this._audio = document.createElement("audio");
 	        this._audio.id = configProvider.PLAYER_TAG_ID;
-	        this._audio.src = SILENCE_URL;
+	        this._audio.src = configProvider.SILENCE_URL;
 	        this._audio.loop = true;
 	        this._currentSong = {};
 	        this._currentIndex = -1;
@@ -749,6 +749,9 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	    get currentSong() {
 	        return this._currentSong;
 	    }
+	    get currentIndex() {
+	        return this._currentIndex;
+	    }
 	    get playlist() {
 	        return this._playlist;
 	    }
@@ -756,33 +759,26 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	        if (!song) {
 	            return;
 	        }
-	        if (this._idsInPlaylist.has(song.id)) {
+	        if (this._idsInPlaylist.has(song.song_id)) {
 	            return;
 	        }
 	        this.sendEvent(eventTypes.PlayerEvent.playlistAdd, song);
 	        this._playlist.push(song);
-	        this._idsInPlaylist.add(song.id);
+	        this._idsInPlaylist.add(song.song_id);
 	    }
 	    removeFromPlaylist(songId) {
 	        this.sendEvent(eventTypes.PlayerEvent.playlistRemove, {
 	            songId,
 	        });
-	        this._playlist = this._playlist.filter((s) => s.id !== songId);
+	        this._playlist = this._playlist.filter((s) => s.song_id !== songId);
 	    }
 	    clearPlaylist() {
 	        this._playlist = [];
 	    }
-	    init(song) {
-	        return __awaiter(this, void 0, void 0, function* () {
-	            this.addToPlaylist(song);
-	            this._currentIndex = 0;
-	            yield this.play(song);
-	        });
-	    }
 	    play(song) {
 	        return __awaiter(this, void 0, void 0, function* () {
 	            this._currentSong = song;
-	            let url = this.getBrstmUrl(song.id);
+	            let url = this.getBrstmUrl(song.song_id);
 	            this.sendEvent(eventTypes.PlayerEvent.play, Object.assign(Object.assign({}, song), { url: url }));
 	            this._state.capabilities = yield (0, browserCapabilities_1.browserCapabilities)();
 	            // fetch details
@@ -1015,7 +1011,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	                    artist: song.uploader,
 	                    artwork: [
 	                        {
-	                            src: ARTWORK_URL,
+	                            src: configProvider.ARTWORK_URL,
 	                            type: "image/png",
 	                            sizes: "560x544",
 	                        },
