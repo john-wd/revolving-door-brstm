@@ -4,6 +4,7 @@ export interface Song {
     name: string;
     uploader: string;
     game_name: string;
+    game_id: number;
 }
 export declare class BrstmPlayer {
     constructor(apiURL?: string);
