@@ -474,9 +474,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	    return samples;
 	}
 	class BrstmPlayer {
-	    constructor(apiURL = configProvider.SMASHCUSTOMMUSIC_URL) {
-	        this._playlist = [];
-	        this._idsInPlaylist = new Set();
+	    constructor() {
 	        this._state = {
 	            hasInitialized: false,
 	            capabilities: {},
@@ -496,17 +494,11 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	            volume: Number(localStorage.getItem("volumeoverride")) || 1,
 	            samplesReady: 0,
 	        };
-	        this._apiURL = apiURL;
 	        this._audio = document.createElement("audio");
 	        this._audio.id = configProvider.PLAYER_TAG_ID;
 	        this._audio.src = configProvider.SILENCE_URL;
 	        this._audio.loop = true;
-	        this._currentSong = {};
-	        this._currentIndex = -1;
 	        document.body.appendChild(this._audio);
-	    }
-	    getBrstmUrl(id) {
-	        return `${this._apiURL}/${id}`;
 	    }
 	    sendEvent(type, payload = {}) {
 	        // dispatchEvent(new CustomEvent(type, { detail: payload }));
@@ -673,12 +665,6 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	    getSongLength() {
 	        return this.totalSamples / this.sampleRate;
 	    }
-	    playAtIndex(idx) {
-	        if (idx <= this.playlist.length) {
-	            this._currentIndex = idx;
-	            this.play(this._playlist[idx]);
-	        }
-	    }
 	    setVolume(level) {
 	        this._state.volume = level;
 	        this.sendEvent(eventTypes.PlayerEvent.setVolume, {
@@ -700,26 +686,6 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	            toSample: this._state.playbackCurrentSample,
 	        });
 	        this.sendUpdateStateEvent();
-	    }
-	    next() {
-	        this.movePlaylist(true);
-	    }
-	    previous() {
-	        this.movePlaylist(false);
-	    }
-	    movePlaylist(up = true) {
-	        if (this.playlist.length === 0) {
-	            return;
-	        }
-	        let idx = up
-	            ? Math.min(this._currentIndex + 1, this._playlist.length - 1)
-	            : Math.max(this._currentIndex - 1, 0);
-	        if (idx === this._currentIndex) {
-	            return;
-	        }
-	        this.sendEvent(eventTypes.PlayerEvent.previous);
-	        this._currentIndex = idx;
-	        this.play(this.playlist[idx]);
 	    }
 	    playPause() {
 	        this._state.paused = !this._state.paused;
@@ -746,39 +712,8 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	        this._state.stopped = true;
 	        this.sendEvent(eventTypes.PlayerEvent.stop);
 	    }
-	    get currentSong() {
-	        return this._currentSong;
-	    }
-	    get currentIndex() {
-	        return this._currentIndex;
-	    }
-	    get playlist() {
-	        return this._playlist;
-	    }
-	    addToPlaylist(song) {
-	        if (!song) {
-	            return;
-	        }
-	        if (this._idsInPlaylist.has(song.song_id)) {
-	            return;
-	        }
-	        this.sendEvent(eventTypes.PlayerEvent.playlistAdd, song);
-	        this._playlist.push(song);
-	        this._idsInPlaylist.add(song.song_id);
-	    }
-	    removeFromPlaylist(songId) {
-	        this.sendEvent(eventTypes.PlayerEvent.playlistRemove, {
-	            songId,
-	        });
-	        this._playlist = this._playlist.filter((s) => s.song_id !== songId);
-	    }
-	    clearPlaylist() {
-	        this._playlist = [];
-	    }
-	    play(song) {
+	    play(url, song) {
 	        return __awaiter(this, void 0, void 0, function* () {
-	            this._currentSong = song;
-	            let url = this.getBrstmUrl(song.song_id);
 	            this.sendEvent(eventTypes.PlayerEvent.play, Object.assign(Object.assign({}, song), { url: url }));
 	            this._state.capabilities = yield (0, browserCapabilities_1.browserCapabilities)();
 	            // fetch details
@@ -1005,18 +940,19 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	            this._audio
 	                .play()
 	                .then((_) => {
-	                navigator.mediaSession.metadata = new MediaMetadata({
-	                    title: song.name,
-	                    album: song.game_name,
-	                    artist: song.uploader,
-	                    artwork: [
-	                        {
-	                            src: configProvider.ARTWORK_URL,
-	                            type: "image/png",
-	                            sizes: "560x544",
-	                        },
-	                    ],
-	                });
+	                if (song)
+	                    navigator.mediaSession.metadata = new MediaMetadata({
+	                        title: song.name,
+	                        album: song.game_name,
+	                        artist: song.uploader,
+	                        artwork: [
+	                            {
+	                                src: configProvider.ARTWORK_URL,
+	                                type: "image/png",
+	                                sizes: "560x544",
+	                            },
+	                        ],
+	                    });
 	                navigator.mediaSession.setActionHandler("play", () => {
 	                    this.playPause();
 	                });
@@ -1026,8 +962,6 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	                navigator.mediaSession.setActionHandler("stop", () => {
 	                    this.stop();
 	                });
-	                navigator.mediaSession.setActionHandler("nexttrack", () => this.next);
-	                navigator.mediaSession.setActionHandler("previoustrack", () => this.previous);
 	            })
 	                .catch((error) => {
 	                console.error(error);
@@ -1483,7 +1417,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	}
 	});
 
-	let player = new player$1.BrstmPlayer("https://smashcustommusic.net/brstm");
+	let player = new player$1.BrstmPlayer();
 	gui.runGUI(player);
 	window.player = player;
 

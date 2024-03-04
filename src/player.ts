@@ -59,7 +59,7 @@ interface State {
 }
 
 export class BrstmPlayer {
-  constructor(apiURL: string = SMASHCUSTOMMUSIC_URL) {
+  constructor() {
     this._state = {
       hasInitialized: false,
       capabilities: {} as Capabilities,
@@ -79,27 +79,15 @@ export class BrstmPlayer {
       volume: Number(localStorage.getItem("volumeoverride")) || 1,
       samplesReady: 0,
     };
-    this._apiURL = apiURL;
     this._audio = document.createElement("audio");
     this._audio.id = PLAYER_TAG_ID;
     this._audio.src = SILENCE_URL;
     this._audio.loop = true;
-    this._currentSong = {} as Song;
-    this._currentIndex = -1;
     document.body.appendChild(this._audio);
-  }
-
-  private getBrstmUrl(id: number): string {
-    return `${this._apiURL}/${id}`;
   }
 
   private _state: State;
   private _audio: HTMLAudioElement;
-  private _apiURL: string;
-  private _currentSong: Song;
-  private _currentIndex: number;
-  private _playlist: Song[] = [];
-  private _idsInPlaylist: Set<number> = new Set<number>();
 
   sendEvent(type: PlayerEvent, payload: object = {}) {
     // dispatchEvent(new CustomEvent(type, { detail: payload }));
@@ -280,13 +268,6 @@ export class BrstmPlayer {
     return this.totalSamples / this.sampleRate;
   }
 
-  playAtIndex(idx: number) {
-    if (idx <= this.playlist.length) {
-      this._currentIndex = idx;
-      this.play(this._playlist[idx]);
-    }
-  }
-
   setVolume(level: number) {
     this._state.volume = level;
     this.sendEvent(PlayerEvent.setVolume, {
@@ -312,26 +293,7 @@ export class BrstmPlayer {
     });
     this.sendUpdateStateEvent();
   }
-  next() {
-    this.movePlaylist(true);
-  }
-  previous() {
-    this.movePlaylist(false);
-  }
-  private movePlaylist(up = true) {
-    if (this.playlist.length === 0) {
-      return;
-    }
-    let idx = up
-      ? Math.min(this._currentIndex + 1, this._playlist.length - 1)
-      : Math.max(this._currentIndex - 1, 0);
-    if (idx === this._currentIndex) {
-      return;
-    }
-    this.sendEvent(PlayerEvent.previous);
-    this._currentIndex = idx;
-    this.play(this.playlist[idx]);
-  }
+
   playPause() {
     this._state.paused = !this._state.paused;
     this._state.audioContext[this._state.paused ? "suspend" : "resume"]();
@@ -358,44 +320,8 @@ export class BrstmPlayer {
     this.sendEvent(PlayerEvent.stop);
   }
 
-  get currentSong(): Song {
-    return this._currentSong;
-  }
 
-  get currentIndex(): number {
-    return this._currentIndex
-  }
-
-  get playlist(): Song[] {
-    return this._playlist;
-  }
-
-  addToPlaylist(song: Song) {
-    if (!song) {
-      return;
-    }
-    if (this._idsInPlaylist.has(song.song_id)) {
-      return;
-    }
-    this.sendEvent(PlayerEvent.playlistAdd, song);
-    this._playlist.push(song);
-    this._idsInPlaylist.add(song.song_id);
-  }
-
-  removeFromPlaylist(songId: number) {
-    this.sendEvent(PlayerEvent.playlistRemove, {
-      songId,
-    });
-    this._playlist = this._playlist.filter((s) => s.song_id !== songId);
-  }
-
-  clearPlaylist() {
-    this._playlist = [];
-  }
-
-  async play(song: Song) {
-    this._currentSong = song;
-    let url = this.getBrstmUrl(song.song_id);
+  async play(url: string, song?: Song) {
     this.sendEvent(PlayerEvent.play, {
       ...song,
       url: url,
@@ -701,7 +627,7 @@ export class BrstmPlayer {
     );
   }
 
-  async _setMediaSessionData(song: Song) {
+  async _setMediaSessionData(song?: Song) {
     if (!this._state.capabilities.mediaSession) {
       return;
     }
@@ -709,18 +635,19 @@ export class BrstmPlayer {
     this._audio
       .play()
       .then((_) => {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: song.name,
-          album: song.game_name,
-          artist: song.uploader,
-          artwork: [
-            {
-              src: ARTWORK_URL,
-              type: "image/png",
-              sizes: "560x544",
-            },
-          ],
-        });
+        if (song)
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: song.name,
+            album: song.game_name,
+            artist: song.uploader,
+            artwork: [
+              {
+                src: ARTWORK_URL,
+                type: "image/png",
+                sizes: "560x544",
+              },
+            ],
+          });
 
         navigator.mediaSession.setActionHandler("play", () => {
           this.playPause();
@@ -731,11 +658,6 @@ export class BrstmPlayer {
         navigator.mediaSession.setActionHandler("stop", () => {
           this.stop();
         });
-        navigator.mediaSession.setActionHandler("nexttrack", () => this.next);
-        navigator.mediaSession.setActionHandler(
-          "previoustrack",
-          () => this.previous
-        );
       })
       .catch((error) => {
         console.error(error);

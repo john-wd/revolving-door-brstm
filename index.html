@@ -10,10 +10,6 @@
 
 <body>
   Song id:<input type="number" min="0" max="99999" value="25772" id="song" />
-  <button href="#" onclick="addToPlaylist(document.querySelector(`#song`).value)">
-    <span class="material-icons">playlist_add</span>
-  </button>
-
   <br />
   <div>
     <button href="#" onclick="playSong(document.querySelector(`#song`).value)">
@@ -25,12 +21,6 @@
     <button onclick="window.player.stop()">
       <span class="material-icons">stop</span>
     </button>
-    <button onclick="window.player.previous()">
-      <span class="material-icons">skip_previous</span>
-    </button>
-    <button onclick="window.player.next()">
-      <span class="material-icons">skip_next</span>
-    </button>
     <button onclick="window.player.decVolume(.1)">
       <span class="material-icons">volume_down</span>
     </button>
@@ -38,14 +28,6 @@
       <span class="material-icons">volume_up</span>
     </button>
   </div>
-  <h3>Playlist</h3>
-  <button onclick="refreshPlaylist()">
-    <span class="material-icons">refresh</span>
-  </button>
-  <button onclick="window.player.clearPlaylist()">
-    <span class="material-icons">playlist_remove</span>
-  </button>
-  <ul id="playlist"></ul>
   <script src="bundle/bundle.min.js"></script>
   <script>
     if (window.location.hash.length > 1) {
@@ -65,59 +47,18 @@
           return;
         }
         song = await resp.json();
-        window.player.play({
-          id: id,
-          name: song.name,
-          length: song.length,
-          loop: song.loop_type,
-          uploader: song.uploader,
-          available: song.available,
-          downloads: song.downloads,
-          game_name: song.game_name,
-        });
-        refreshPlaylist();
-      });
-    }
-    async function addToPlaylist(id) {
-      fetchSong(id).then(async (resp) => {
-        if (resp.status >= 400) {
-          return;
-        }
-        song = await resp.json();
-        window.player.addToPlaylist({
-          id: id,
-          name: song.name,
-          length: song.length,
-          loop: song.loop_type,
-          uploader: song.uploader,
-          available: song.available,
-          downloads: song.downloads,
-          game_name: song.game_name,
-        });
-        refreshPlaylist();
-      });
-    }
-    function refreshPlaylist() {
-      let ul = document.getElementById("playlist");
-      if (!ul) {
-        return;
-      }
-      ul.innerHTML = "";
-      window.player.playlist.forEach((s, i) => {
-        let li = document.createElement("li");
-        li.innerText = s.name;
-        if (window.player.currentIndex === i) {
-          li.innerHTML = `<b>${s.name}</b>`
-        }
-        li.id = s.id;
-        let a = document.createElement("a")
-        a.onclick = (ev) => {
-          window.player.playAtIndex(i)
-          refreshPlaylist()
-        }
-
-        a.appendChild(li)
-        ul.appendChild(a);
+        window.player.play(
+          `https://smashcustommusic.net/brstm/${id}`,
+          {
+            id: id,
+            name: song.name,
+            length: song.length,
+            loop: song.loop_type,
+            uploader: song.uploader,
+            available: song.available,
+            downloads: song.downloads,
+            game_name: song.game_name,
+          });
       });
     }
   </script>

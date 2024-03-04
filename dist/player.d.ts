@@ -7,15 +7,9 @@ export interface Song {
     game_id: number;
 }
 export declare class BrstmPlayer {
-    constructor(apiURL?: string);
-    private getBrstmUrl;
+    constructor();
     private _state;
     private _audio;
-    private _apiURL;
-    private _currentSong;
-    private _currentIndex;
-    private _playlist;
-    private _idsInPlaylist;
     sendEvent(type: PlayerEvent, payload?: object): void;
     sendUpdateStateEvent(): void;
     private getResampledSample;
@@ -24,23 +18,13 @@ export declare class BrstmPlayer {
     get totalSamples(): number;
     get sampleRate(): number;
     getSongLength(): number;
-    playAtIndex(idx: number): void;
     setVolume(level: number): void;
     incVolume(step: number): void;
     decVolume(step: number): void;
     seek(to: number): void;
-    next(): void;
-    previous(): void;
-    private movePlaylist;
     playPause(): void;
     setLoop(enable: boolean): void;
     stop(): void;
-    get currentSong(): Song;
-    get currentIndex(): number;
-    get playlist(): Song[];
-    addToPlaylist(song: Song): void;
-    removeFromPlaylist(songId: number): void;
-    clearPlaylist(): void;
-    play(song: Song): Promise<void>;
-    _setMediaSessionData(song: Song): Promise<void>;
+    play(url: string, song?: Song): Promise<void>;
+    _setMediaSessionData(song?: Song): Promise<void>;
 }
