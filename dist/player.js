@@ -14,14 +14,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BrstmPlayer = void 0;
 // This script shouldn't do anything without explicit user interaction (Triggering playback)
+const brstm_1 = require("brstm");
+const browserCapabilities_1 = require("./browserCapabilities");
 const configProvider_1 = require("./configProvider");
 const copyToChannelPolyfill_1 = __importDefault(require("./copyToChannelPolyfill"));
-const resampler_1 = __importDefault(require("./resampler"));
-const webAudioUnlock_1 = __importDefault(require("./webAudioUnlock"));
-const browserCapabilities_1 = require("./browserCapabilities");
-const util_1 = require("./util");
-const brstm_1 = require("brstm");
 const eventTypes_1 = require("./eventTypes");
+const resampler_1 = __importDefault(require("./resampler"));
+const util_1 = require("./util");
+const webAudioUnlock_1 = __importDefault(require("./webAudioUnlock"));
 function partitionedGetSamples(brstm, start, size) {
     let samples = [];
     let got = 0;
@@ -53,10 +53,14 @@ class BrstmPlayer {
             paused: false,
             stopped: false,
             enableLoop: false,
+            loopCount: 0,
+            loopFor: Number.MAX_SAFE_INTEGER,
             streamCancel: false,
             playAudioRunning: false,
             volume: Number(localStorage.getItem("volumeoverride")) || 1,
             samplesReady: 0,
+            isCrossfading: false,
+            crossfade: false,
         };
         this._audio = document.createElement("audio");
         this._audio.id = configProvider_1.PLAYER_TAG_ID;
@@ -229,6 +233,12 @@ class BrstmPlayer {
     getSongLength() {
         return this.totalSamples / this.sampleRate;
     }
+    crossfadeStep() {
+        this.decVolume(0.01);
+        if (this._state.volume <= 0) {
+            this.stop();
+        }
+    }
     setVolume(level) {
         this._state.volume = level;
         this.sendEvent(eventTypes_1.PlayerEvent.setVolume, {
@@ -265,10 +275,12 @@ class BrstmPlayer {
         });
         this.sendUpdateStateEvent();
     }
-    setLoop(enable) {
-        this._state.enableLoop = enable;
+    setLoop(loopType, loopFor) {
+        this._state.loopType = loopType;
+        this._state.loopFor = loopFor || Number.MAX_SAFE_INTEGER;
         this.sendEvent(eventTypes_1.PlayerEvent.setLoop, {
-            loop: enable,
+            loopType,
+            loopFor,
         });
         this.sendUpdateStateEvent();
     }
@@ -276,14 +288,48 @@ class BrstmPlayer {
         this._state.stopped = true;
         this.sendEvent(eventTypes_1.PlayerEvent.stop);
     }
-    play(url, song) {
+    shouldLoop() {
+        let loopNow = false;
+        switch (this._state.loopType) {
+            case "count":
+                loopNow = this._state.loopCount < this._state.loopFor;
+                break;
+            case "time":
+                loopNow = this._state.loopCount * (this.totalSamples / this.sampleRate) < this._state.loopFor;
+                break;
+            case "none":
+                loopNow = false;
+                break;
+            case "infinite":
+                return true;
+        }
+        if (!loopNow && this._state.crossfade) {
+            this._state.isCrossfading = true;
+            return true; // loop one last time
+        }
+        this._state.loopCount += 1;
+        return loopNow;
+    }
+    restartState() {
+        this._state = Object.assign(Object.assign({}, this._state), { volume: 1, isCrossfading: false, loopCount: 0, stopped: false });
+    }
+    play(url, options) {
         return __awaiter(this, void 0, void 0, function* () {
-            this.sendEvent(eventTypes_1.PlayerEvent.play, Object.assign(Object.assign({}, song), { url: url }));
+            this.sendEvent(eventTypes_1.PlayerEvent.play, {
+                url: url,
+            });
+            this.restartState();
             this._state.capabilities = yield (0, browserCapabilities_1.browserCapabilities)();
+            this._state.crossfade = options.crossfade;
+            this._state.loopType = options.loopType;
+            if (options.loopFor)
+                this._state.loopFor = options.loopFor;
             // fetch details
-            this._setMediaSessionData(song);
-            if (this._state.capabilities.mediaSession) {
-                navigator.mediaSession.playbackState = "playing";
+            if (options.mediaControls) {
+                this._setMediaSessionData(options.song);
+                if (this._state.capabilities.mediaSession) {
+                    navigator.mediaSession.playbackState = "playing";
+                }
             }
             // Entry point to the
             this._state.stopped = false;
@@ -402,6 +448,9 @@ class BrstmPlayer {
                 // This will be filled using the below code for handling looping
                 if (this._state.playbackCurrentSample + loadBufferSize <
                     this._state.brstm.metadata.totalSamples) {
+                    // Step crossfader, if enabled
+                    if (this._state.isCrossfading)
+                        this.crossfadeStep();
                     // Standard codepath if no loop
                     // Populate samples with enough that we can just play it (or resample + play it) without glitches
                     samples = partitionedGetSamples(this._state.brstm, this._state.playbackCurrentSample, loadBufferSize);
@@ -411,7 +460,7 @@ class BrstmPlayer {
                 else {
                     // We are reaching EOF
                     // Check if we have looping enabled
-                    if (this._state.enableLoop) {
+                    if (this.shouldLoop()) {
                         // First, get all the samples to the end of the file
                         samples = partitionedGetSamples(this._state.brstm, this._state.playbackCurrentSample, this._state.brstm.metadata.totalSamples -
                             this._state.playbackCurrentSample);

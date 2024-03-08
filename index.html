@@ -50,14 +50,9 @@
         window.player.play(
           `https://smashcustommusic.net/brstm/${id}`,
           {
-            id: id,
-            name: song.name,
-            length: song.length,
-            loop: song.loop_type,
-            uploader: song.uploader,
-            available: song.available,
-            downloads: song.downloads,
-            game_name: song.game_name,
+            loopType: "count",
+            loopFor: 1,
+            crossfade: true,
           });
       });
     }

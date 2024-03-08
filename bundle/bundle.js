@@ -8,6 +8,80 @@
 		return fn(module, module.exports), module.exports;
 	}
 
+	var brstm = createCommonjsModule(function (module, exports) {
+	var q=(r,t,s)=>{if(!t.has(r))throw TypeError("Cannot "+s)};var e=(r,t,s)=>(q(r,t,"read from private field"),s?s.call(r):t.get(r)),S=(r,t,s)=>{if(t.has(r))throw TypeError("Cannot add the same private member more than once");t instanceof WeakSet?t.add(r):t.set(r,s);},B=(r,t,s,h)=>(q(r,t,"write to private field"),h?h.call(r,s):t.set(r,s),s);var C=(r,t,s)=>(q(r,t,"access private method"),s);Object.defineProperties(exports,{__esModule:{value:!0},[Symbol.toStringTag]:{value:"Module"}});function Q(r,t,s){const h=[];for(let i=t;i<t+s;i++)h.push(r[i]);return h}const R={LITTLE:0,BIG:1};function at(r){const t=Q(r,4,2);return t[0]===255&&t[1]===254?R.LITTLE:R.BIG}function nt(r,t,s,h=R.BIG){const i=Q(r,t,s);return h===R.LITTLE&&i.reverse(),String.fromCharCode(...i)}function a(r,t,s,h=R.BIG){const i=Q(r,t,s);return h===R.LITTLE&&i.reverse(),i.reduce((l,n)=>l*256+n,0)}function J(r,t,s){return r<=t?t:r>=s?s:r}function b(r){return r>=32768?r-65536:r}var T,w,g,z,A,L,E,P,M,x,F,Y,G,Z,N,$,O,tt,H,K;class it{constructor(t){S(this,F);S(this,G);S(this,N);S(this,O);S(this,H);S(this,T,void 0);S(this,w,void 0);S(this,g,void 0);S(this,z,void 0);S(this,A,void 0);S(this,L,void 0);S(this,E,void 0);S(this,P,void 0);S(this,M,void 0);S(this,x,void 0);if(B(this,E,null),B(this,P,null),B(this,M,null),B(this,x,[]),this.rawData=new Uint8Array(t),nt(this.rawData,0,4)!=="RSTM")throw new Error("Not a valid BRSTM file");this.endianness=at(this.rawData),B(this,T,a(this.rawData,16,4,this.endianness)),B(this,w,e(this,T)+a(this.rawData,e(this,T)+12,4,this.endianness)+8),B(this,g,e(this,T)+a(this.rawData,e(this,T)+20,4,this.endianness)+8),B(this,z,e(this,T)+a(this.rawData,e(this,T)+28,4,this.endianness)+8),B(this,A,a(this.rawData,24,4,this.endianness)),B(this,L,a(this.rawData,32,4,this.endianness)),this.metadata=C(this,G,Z).call(this);}getAllSamples(){if(e(this,E))return e(this,E);const{numberChannels:t,totalSamples:s,totalBlocks:h,samplesPerBlock:i}=this.metadata,l=[];for(let n=0;n<t;n++)l.push(new Int16Array(s));for(let n=0;n<h;n++){const d=C(this,H,K).call(this,n);for(let p=0;p<t;p++)l[p].set(d[p],n*i);}return B(this,E,l),l}getBuffer(t,s){return this.getSamples(t,s)}getSamples(t,s){const{numberChannels:h,totalBlocks:i,totalSamples:l,samplesPerBlock:n}=this.metadata,d=Math.max(0,t),p=Math.min(l,t+s),o=Math.max(0,Math.floor(d/n)),f=Math.min(i-1,Math.floor(p/n)),D=[];for(let m=o;m<=f;m++)D.push(C(this,H,K).call(this,m));const u=[];for(let m=0;m<h;m++)u.push(new Int16Array(p-d));for(let m=o;m<=f;m++){const I=m-o;if(m===o&&m===f)for(let c=0;c<h;c++)u[c].set(D[I][c].slice(d-o*n,d-o*n+s),0);else if(m===o)for(let c=0;c<h;c++){const k=D[I][c].slice(d-o*n);u[c].set(k,0);}else if(m===f)for(let c=0;c<h;c++){const k=D[I][c].slice(0,p-D[I][c].length-o*n);k.length+(m*n-d)>u[c].length?u[c].set(k.slice(0,s-(m*n-d)),m*n-d):u[c].set(k,m*n-d);}else for(let c=0;c<h;c++)u[c].set(D[I][c],m*n-d);}return u}}T=new WeakMap,w=new WeakMap,g=new WeakMap,z=new WeakMap,A=new WeakMap,L=new WeakMap,E=new WeakMap,P=new WeakMap,M=new WeakMap,x=new WeakMap,F=new WeakSet,Y=function(){if(e(this,M))return e(this,M);const{numberChannels:t}=this.metadata,s=[];for(let h=0;h<t;h++){const i=e(this,T)+a(this.rawData,e(this,z)+8+h*8,4,this.endianness)+8+8,l=[];for(let n=0;n<16;n++){const d=a(this.rawData,i+2*n,2,this.endianness);l.push(b(d));}s.push({adpcmCoefficients:l,gain:a(this.rawData,i+40,2,this.endianness),initialPredictorScale:a(this.rawData,i+42,2,this.endianness),historySample1:a(this.rawData,i+44,2,this.endianness),historySample2:a(this.rawData,i+46,2,this.endianness),loopPredictorScale:a(this.rawData,i+48,2,this.endianness),loopHistorySample1:a(this.rawData,i+50,2,this.endianness),loopHistorySample2:a(this.rawData,i+52,2,this.endianness)});}return B(this,M,s),s},G=new WeakSet,Z=function(){const t=a(this.rawData,e(this,w)+2,1,this.endianness),s=a(this.rawData,e(this,g),1,this.endianness),h=a(this.rawData,e(this,g)+1,1,this.endianness),i=[];for(let n=0;n<s;n++){const d=e(this,T)+8+a(this.rawData,e(this,g)+4+n*8+4,4,this.endianness),p=a(this.rawData,e(this,g)+4+n*8+1,1,this.endianness);let o=0;p===0?o=a(this.rawData,d,1,this.endianness):p===1&&(o=a(this.rawData,d+8,1,this.endianness)),i.push({numberChannels:o,type:p});}const l={fileSize:a(this.rawData,8,4,this.endianness),endianness:this.endianness,codec:a(this.rawData,e(this,w),1,this.endianness),loopFlag:a(this.rawData,e(this,w)+1,1,this.endianness),numberChannels:t,sampleRate:a(this.rawData,e(this,w)+4,2,this.endianness),loopStartSample:a(this.rawData,e(this,w)+8,4,this.endianness),totalSamples:a(this.rawData,e(this,w)+12,4,this.endianness),totalBlocks:a(this.rawData,e(this,w)+20,4,this.endianness),blockSize:a(this.rawData,e(this,w)+24,4,this.endianness),samplesPerBlock:a(this.rawData,e(this,w)+28,4,this.endianness),finalBlockSize:a(this.rawData,e(this,w)+32,4,this.endianness),finalBlockSizeWithPadding:a(this.rawData,e(this,w)+40,4,this.endianness),totalSamplesInFinalBlock:a(this.rawData,e(this,w)+36,4,this.endianness),adpcTableSamplesPerEntry:a(this.rawData,e(this,w)+44,4,this.endianness),adpcTableBytesPerEntry:a(this.rawData,e(this,w)+48,4,this.endianness),numberTracks:s,trackDescriptionType:h,trackDescriptions:i};return l.loopStartSample>=l.totalSamples&&(l.loopFlag=0,l.loopStartSample=0,console.warn("The loop start sample in this file is invalid.")),l},N=new WeakSet,$=function(t){const{blockSize:s,totalBlocks:h,numberChannels:i,finalBlockSize:l,finalBlockSizeWithPadding:n}=this.metadata,d=[];for(let o=0;o<i;o++)d.push(new Uint8Array(t===h-1?l:s));let p=t;for(let o=0;o<i;o++){const f=o!==0&&p+1===h?p*i*s+o*n:(p*i+o)*s,D=p+1===h?f+l:f+s,u=this.rawData.slice(e(this,L)+32+f,e(this,L)+32+D);d[o].set(u);}return d},O=new WeakSet,tt=function(){if(e(this,P))return e(this,P);const{totalBlocks:t,numberChannels:s}=this.metadata,h=a(this.rawData,e(this,A)+4,4,this.endianness),i=this.rawData.slice(e(this,A)+8,e(this,A)+8+h);let l=0,n=0,d=0;for(let f=0;f<s;f++)n=b(a(i,l,2,this.endianness)),l+=2,d=b(a(i,l,2,this.endianness)),l+=2;const p=[];for(let f=0;f<t;f++){p.push([]);for(let D=0;D<s;D++)f>0&&(n=b(a(i,l,2,this.endianness)),l+=2,d=b(a(i,l,2,this.endianness)),l+=2),p[f].push({yn1:n,yn2:d});}let o=[];for(let f=0;f<s;f++)o.push(p.map(D=>D[f]));return B(this,P,o),o},H=new WeakSet,K=function(t){if(e(this,x)[t])return e(this,x)[t];const{numberChannels:s,totalBlocks:h,totalSamplesInFinalBlock:i,samplesPerBlock:l,codec:n}=this.metadata,d=C(this,F,Y).call(this),p=C(this,N,$).call(this,t),o=C(this,O,tt).call(this),f=[],D=t===h-1?i:l;for(let u=0;u<s;u++)f.push(new Int16Array(D));for(let u=0;u<s;u++){const{adpcmCoefficients:m}=d[u],I=p[u],c=[];if(n===2){const k=I[0],{yn1:U,yn2:st}=o[u][t];let W=k,v=U,V=st,_=0;for(let j=0;j<D;){let y=0;j%14===0&&(W=I[_++]),(j++&1)===0?y=I[_]>>4:y=I[_++]&15,y>=8&&(y-=16);const et=1<<(W&15),X=W>>4<<1;y=1024+(et*y<<11)+m[J(X,0,15)]*v+m[J(X+1,0,15)]*V>>11,V=v,v=J(y,-32768,32767),c.push(v);}t<h-1&&(o[u][t+1].yn1=c[D-1],o[u][t+1].yn2=c[D-2]);}else if(n===1)for(let k=0;k<D;k++){const U=b(a(I,k*2,2,this.endianness));c.push(U);}else if(n===0)for(let k=0;k<D;k++)c.push(b(I[k])*256);else throw new Error("Invalid codec");f[u].set(c);}return e(this,x)[t]=f,f};exports.Brstm=it;
+	});
+
+	var browserCapabilities_1 = createCommonjsModule(function (module, exports) {
+	var __awaiter = (commonjsGlobal && commonjsGlobal.__awaiter) || function (thisArg, _arguments, P, generator) {
+	    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+	    return new (P || (P = Promise))(function (resolve, reject) {
+	        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+	        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+	        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+	        step((generator = generator.apply(thisArg, _arguments || [])).next());
+	    });
+	};
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.browserCapabilities = void 0;
+	function browserCapabilities() {
+	    return __awaiter(this, void 0, void 0, function* () {
+	        let capabilities = {
+	            sampleRate: false,
+	            streaming: false,
+	            mediaSession: false,
+	        };
+	        // Evaluate webaudio
+	        try {
+	            let ctx = new (window.AudioContext || AudioContext)({
+	                sampleRate: 8000,
+	            });
+	            capabilities.sampleRate = ctx.sampleRate === 8000;
+	            ctx.close();
+	        }
+	        catch (e) {
+	            console.log("WebAudio sample rate capability detection failed. Assuming fallback.");
+	        }
+	        // Evaluate streaming
+	        try {
+	            let b = new Uint8Array(Math.pow(2, 16));
+	            let blob = new Blob([b], { type: "application/octet-stream" });
+	            let u = URL.createObjectURL(blob);
+	            let resp = yield fetch(u);
+	            let body = yield resp.body;
+	            if (!body) {
+	                throw "could not get body";
+	            }
+	            const reader = body.getReader();
+	            while (true) {
+	                let d = yield reader.read();
+	                if (d.done) {
+	                    break;
+	                }
+	            }
+	            capabilities.streaming = true;
+	        }
+	        catch (e) {
+	            console.log("Streaming capability detection failed. Assuming fallback.");
+	        }
+	        // Evaluate mediaSession
+	        capabilities.mediaSession = "mediaSession" in navigator;
+	        // Check for Chrome 89
+	        // https://stackoverflow.com/a/4900484
+	        // https://github.com/rphsoftware/revolving-door/issues/10
+	        // To Rph: Remove this chunk of code if you manage to implement a proper fix before the heat death of the universe.
+	        var raw = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
+	        var chromeVersion = raw ? parseInt(raw[2], 10) : false;
+	        if (chromeVersion !== false && chromeVersion >= 89) {
+	            //Disable native resampling
+	            capabilities.sampleRate = false;
+	        }
+	        return capabilities;
+	    });
+	}
+	exports.browserCapabilities = browserCapabilities;
+	});
+
 	var configProvider = createCommonjsModule(function (module, exports) {
 	Object.defineProperty(exports, "__esModule", { value: true });
 	exports.ARTWORK_URL = exports.SILENCE_URL = exports.SMASHCUSTOMMUSIC_URL = exports.PLAYER_TAG_ID = exports.STREAMING_MIN_RESPONSE = void 0;
@@ -34,6 +108,31 @@
 	var copyToChannelPolyfill = /*#__PURE__*/Object.defineProperty({
 		default: _default$2
 	}, '__esModule', {value: true});
+
+	var eventTypes = createCommonjsModule(function (module, exports) {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.PlayerEvent = void 0;
+	(function (PlayerEvent) {
+	    PlayerEvent["start"] = "brstm_start";
+	    PlayerEvent["play"] = "brstm_play";
+	    PlayerEvent["pause"] = "brstm_pause";
+	    PlayerEvent["playPause"] = "brstm_playpause";
+	    PlayerEvent["stop"] = "brstm_stop";
+	    PlayerEvent["next"] = "brstm_next";
+	    PlayerEvent["previous"] = "brstm_previous";
+	    PlayerEvent["seek"] = "brstm_seek";
+	    PlayerEvent["setLoop"] = "brstm_setloop";
+	    PlayerEvent["setVolume"] = "brstm_setvolume";
+	    PlayerEvent["buffering"] = "brstm_buffering";
+	    PlayerEvent["loading"] = "brstm_loading";
+	    PlayerEvent["loaded"] = "brstm_loaded";
+	    PlayerEvent["killed"] = "brstm_killed";
+	    PlayerEvent["step"] = "brstm_step";
+	    PlayerEvent["resetState"] = "brstm_resetstate";
+	    PlayerEvent["playlistAdd"] = "brstm_playlist_add";
+	    PlayerEvent["playlistRemove"] = "brstm_playlist_remove";
+	})(exports.PlayerEvent || (exports.PlayerEvent = {}));
+	});
 
 	//JavaScript Audio Resampler
 	//Copyright (C) 2011-2015 Grant Galitz
@@ -239,6 +338,26 @@
 		default: _default$1
 	}, '__esModule', {value: true});
 
+	var util = createCommonjsModule(function (module, exports) {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.awaitMessage = exports.powersOf2 = exports.sleep = void 0;
+	const sleep = (timeout) => new Promise((resolve) => setTimeout(resolve, timeout));
+	exports.sleep = sleep;
+	exports.powersOf2 = [256, 512, 1024, 2048, 4096, 8192, 16384, 32768];
+	function awaitMessage(content) {
+	    return new Promise((resolve) => {
+	        let handler = (evt) => {
+	            if (evt.data === content && evt.isTrusted) {
+	                window.removeEventListener("message", handler);
+	                resolve();
+	            }
+	        };
+	        window.addEventListener("message", handler);
+	    });
+	}
+	exports.awaitMessage = awaitMessage;
+	});
+
 	var __awaiter = (commonjsGlobal && commonjsGlobal.__awaiter) || function (thisArg, _arguments, P, generator) {
 	    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
 	    return new (P || (P = Promise))(function (resolve, reject) {
@@ -313,125 +432,6 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 		default: _default
 	}, '__esModule', {value: true});
 
-	var browserCapabilities_1 = createCommonjsModule(function (module, exports) {
-	var __awaiter = (commonjsGlobal && commonjsGlobal.__awaiter) || function (thisArg, _arguments, P, generator) {
-	    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-	    return new (P || (P = Promise))(function (resolve, reject) {
-	        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-	        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-	        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-	        step((generator = generator.apply(thisArg, _arguments || [])).next());
-	    });
-	};
-	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.browserCapabilities = void 0;
-	function browserCapabilities() {
-	    return __awaiter(this, void 0, void 0, function* () {
-	        let capabilities = {
-	            sampleRate: false,
-	            streaming: false,
-	            mediaSession: false,
-	        };
-	        // Evaluate webaudio
-	        try {
-	            let ctx = new (window.AudioContext || AudioContext)({
-	                sampleRate: 8000,
-	            });
-	            capabilities.sampleRate = ctx.sampleRate === 8000;
-	            ctx.close();
-	        }
-	        catch (e) {
-	            console.log("WebAudio sample rate capability detection failed. Assuming fallback.");
-	        }
-	        // Evaluate streaming
-	        try {
-	            let b = new Uint8Array(Math.pow(2, 16));
-	            let blob = new Blob([b], { type: "application/octet-stream" });
-	            let u = URL.createObjectURL(blob);
-	            let resp = yield fetch(u);
-	            let body = yield resp.body;
-	            if (!body) {
-	                throw "could not get body";
-	            }
-	            const reader = body.getReader();
-	            while (true) {
-	                let d = yield reader.read();
-	                if (d.done) {
-	                    break;
-	                }
-	            }
-	            capabilities.streaming = true;
-	        }
-	        catch (e) {
-	            console.log("Streaming capability detection failed. Assuming fallback.");
-	        }
-	        // Evaluate mediaSession
-	        capabilities.mediaSession = "mediaSession" in navigator;
-	        // Check for Chrome 89
-	        // https://stackoverflow.com/a/4900484
-	        // https://github.com/rphsoftware/revolving-door/issues/10
-	        // To Rph: Remove this chunk of code if you manage to implement a proper fix before the heat death of the universe.
-	        var raw = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
-	        var chromeVersion = raw ? parseInt(raw[2], 10) : false;
-	        if (chromeVersion !== false && chromeVersion >= 89) {
-	            //Disable native resampling
-	            capabilities.sampleRate = false;
-	        }
-	        return capabilities;
-	    });
-	}
-	exports.browserCapabilities = browserCapabilities;
-	});
-
-	var util = createCommonjsModule(function (module, exports) {
-	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.awaitMessage = exports.powersOf2 = exports.sleep = void 0;
-	const sleep = (timeout) => new Promise((resolve) => setTimeout(resolve, timeout));
-	exports.sleep = sleep;
-	exports.powersOf2 = [256, 512, 1024, 2048, 4096, 8192, 16384, 32768];
-	function awaitMessage(content) {
-	    return new Promise((resolve) => {
-	        let handler = (evt) => {
-	            if (evt.data === content && evt.isTrusted) {
-	                window.removeEventListener("message", handler);
-	                resolve();
-	            }
-	        };
-	        window.addEventListener("message", handler);
-	    });
-	}
-	exports.awaitMessage = awaitMessage;
-	});
-
-	var brstm = createCommonjsModule(function (module, exports) {
-	var q=(r,t,s)=>{if(!t.has(r))throw TypeError("Cannot "+s)};var e=(r,t,s)=>(q(r,t,"read from private field"),s?s.call(r):t.get(r)),S=(r,t,s)=>{if(t.has(r))throw TypeError("Cannot add the same private member more than once");t instanceof WeakSet?t.add(r):t.set(r,s);},B=(r,t,s,h)=>(q(r,t,"write to private field"),h?h.call(r,s):t.set(r,s),s);var C=(r,t,s)=>(q(r,t,"access private method"),s);Object.defineProperties(exports,{__esModule:{value:!0},[Symbol.toStringTag]:{value:"Module"}});function Q(r,t,s){const h=[];for(let i=t;i<t+s;i++)h.push(r[i]);return h}const R={LITTLE:0,BIG:1};function at(r){const t=Q(r,4,2);return t[0]===255&&t[1]===254?R.LITTLE:R.BIG}function nt(r,t,s,h=R.BIG){const i=Q(r,t,s);return h===R.LITTLE&&i.reverse(),String.fromCharCode(...i)}function a(r,t,s,h=R.BIG){const i=Q(r,t,s);return h===R.LITTLE&&i.reverse(),i.reduce((l,n)=>l*256+n,0)}function J(r,t,s){return r<=t?t:r>=s?s:r}function b(r){return r>=32768?r-65536:r}var T,w,g,z,A,L,E,P,M,x,F,Y,G,Z,N,$,O,tt,H,K;class it{constructor(t){S(this,F);S(this,G);S(this,N);S(this,O);S(this,H);S(this,T,void 0);S(this,w,void 0);S(this,g,void 0);S(this,z,void 0);S(this,A,void 0);S(this,L,void 0);S(this,E,void 0);S(this,P,void 0);S(this,M,void 0);S(this,x,void 0);if(B(this,E,null),B(this,P,null),B(this,M,null),B(this,x,[]),this.rawData=new Uint8Array(t),nt(this.rawData,0,4)!=="RSTM")throw new Error("Not a valid BRSTM file");this.endianness=at(this.rawData),B(this,T,a(this.rawData,16,4,this.endianness)),B(this,w,e(this,T)+a(this.rawData,e(this,T)+12,4,this.endianness)+8),B(this,g,e(this,T)+a(this.rawData,e(this,T)+20,4,this.endianness)+8),B(this,z,e(this,T)+a(this.rawData,e(this,T)+28,4,this.endianness)+8),B(this,A,a(this.rawData,24,4,this.endianness)),B(this,L,a(this.rawData,32,4,this.endianness)),this.metadata=C(this,G,Z).call(this);}getAllSamples(){if(e(this,E))return e(this,E);const{numberChannels:t,totalSamples:s,totalBlocks:h,samplesPerBlock:i}=this.metadata,l=[];for(let n=0;n<t;n++)l.push(new Int16Array(s));for(let n=0;n<h;n++){const d=C(this,H,K).call(this,n);for(let p=0;p<t;p++)l[p].set(d[p],n*i);}return B(this,E,l),l}getBuffer(t,s){return this.getSamples(t,s)}getSamples(t,s){const{numberChannels:h,totalBlocks:i,totalSamples:l,samplesPerBlock:n}=this.metadata,d=Math.max(0,t),p=Math.min(l,t+s),o=Math.max(0,Math.floor(d/n)),f=Math.min(i-1,Math.floor(p/n)),D=[];for(let m=o;m<=f;m++)D.push(C(this,H,K).call(this,m));const u=[];for(let m=0;m<h;m++)u.push(new Int16Array(p-d));for(let m=o;m<=f;m++){const I=m-o;if(m===o&&m===f)for(let c=0;c<h;c++)u[c].set(D[I][c].slice(d-o*n,d-o*n+s),0);else if(m===o)for(let c=0;c<h;c++){const k=D[I][c].slice(d-o*n);u[c].set(k,0);}else if(m===f)for(let c=0;c<h;c++){const k=D[I][c].slice(0,p-D[I][c].length-o*n);k.length+(m*n-d)>u[c].length?u[c].set(k.slice(0,s-(m*n-d)),m*n-d):u[c].set(k,m*n-d);}else for(let c=0;c<h;c++)u[c].set(D[I][c],m*n-d);}return u}}T=new WeakMap,w=new WeakMap,g=new WeakMap,z=new WeakMap,A=new WeakMap,L=new WeakMap,E=new WeakMap,P=new WeakMap,M=new WeakMap,x=new WeakMap,F=new WeakSet,Y=function(){if(e(this,M))return e(this,M);const{numberChannels:t}=this.metadata,s=[];for(let h=0;h<t;h++){const i=e(this,T)+a(this.rawData,e(this,z)+8+h*8,4,this.endianness)+8+8,l=[];for(let n=0;n<16;n++){const d=a(this.rawData,i+2*n,2,this.endianness);l.push(b(d));}s.push({adpcmCoefficients:l,gain:a(this.rawData,i+40,2,this.endianness),initialPredictorScale:a(this.rawData,i+42,2,this.endianness),historySample1:a(this.rawData,i+44,2,this.endianness),historySample2:a(this.rawData,i+46,2,this.endianness),loopPredictorScale:a(this.rawData,i+48,2,this.endianness),loopHistorySample1:a(this.rawData,i+50,2,this.endianness),loopHistorySample2:a(this.rawData,i+52,2,this.endianness)});}return B(this,M,s),s},G=new WeakSet,Z=function(){const t=a(this.rawData,e(this,w)+2,1,this.endianness),s=a(this.rawData,e(this,g),1,this.endianness),h=a(this.rawData,e(this,g)+1,1,this.endianness),i=[];for(let n=0;n<s;n++){const d=e(this,T)+8+a(this.rawData,e(this,g)+4+n*8+4,4,this.endianness),p=a(this.rawData,e(this,g)+4+n*8+1,1,this.endianness);let o=0;p===0?o=a(this.rawData,d,1,this.endianness):p===1&&(o=a(this.rawData,d+8,1,this.endianness)),i.push({numberChannels:o,type:p});}const l={fileSize:a(this.rawData,8,4,this.endianness),endianness:this.endianness,codec:a(this.rawData,e(this,w),1,this.endianness),loopFlag:a(this.rawData,e(this,w)+1,1,this.endianness),numberChannels:t,sampleRate:a(this.rawData,e(this,w)+4,2,this.endianness),loopStartSample:a(this.rawData,e(this,w)+8,4,this.endianness),totalSamples:a(this.rawData,e(this,w)+12,4,this.endianness),totalBlocks:a(this.rawData,e(this,w)+20,4,this.endianness),blockSize:a(this.rawData,e(this,w)+24,4,this.endianness),samplesPerBlock:a(this.rawData,e(this,w)+28,4,this.endianness),finalBlockSize:a(this.rawData,e(this,w)+32,4,this.endianness),finalBlockSizeWithPadding:a(this.rawData,e(this,w)+40,4,this.endianness),totalSamplesInFinalBlock:a(this.rawData,e(this,w)+36,4,this.endianness),adpcTableSamplesPerEntry:a(this.rawData,e(this,w)+44,4,this.endianness),adpcTableBytesPerEntry:a(this.rawData,e(this,w)+48,4,this.endianness),numberTracks:s,trackDescriptionType:h,trackDescriptions:i};return l.loopStartSample>=l.totalSamples&&(l.loopFlag=0,l.loopStartSample=0,console.warn("The loop start sample in this file is invalid.")),l},N=new WeakSet,$=function(t){const{blockSize:s,totalBlocks:h,numberChannels:i,finalBlockSize:l,finalBlockSizeWithPadding:n}=this.metadata,d=[];for(let o=0;o<i;o++)d.push(new Uint8Array(t===h-1?l:s));let p=t;for(let o=0;o<i;o++){const f=o!==0&&p+1===h?p*i*s+o*n:(p*i+o)*s,D=p+1===h?f+l:f+s,u=this.rawData.slice(e(this,L)+32+f,e(this,L)+32+D);d[o].set(u);}return d},O=new WeakSet,tt=function(){if(e(this,P))return e(this,P);const{totalBlocks:t,numberChannels:s}=this.metadata,h=a(this.rawData,e(this,A)+4,4,this.endianness),i=this.rawData.slice(e(this,A)+8,e(this,A)+8+h);let l=0,n=0,d=0;for(let f=0;f<s;f++)n=b(a(i,l,2,this.endianness)),l+=2,d=b(a(i,l,2,this.endianness)),l+=2;const p=[];for(let f=0;f<t;f++){p.push([]);for(let D=0;D<s;D++)f>0&&(n=b(a(i,l,2,this.endianness)),l+=2,d=b(a(i,l,2,this.endianness)),l+=2),p[f].push({yn1:n,yn2:d});}let o=[];for(let f=0;f<s;f++)o.push(p.map(D=>D[f]));return B(this,P,o),o},H=new WeakSet,K=function(t){if(e(this,x)[t])return e(this,x)[t];const{numberChannels:s,totalBlocks:h,totalSamplesInFinalBlock:i,samplesPerBlock:l,codec:n}=this.metadata,d=C(this,F,Y).call(this),p=C(this,N,$).call(this,t),o=C(this,O,tt).call(this),f=[],D=t===h-1?i:l;for(let u=0;u<s;u++)f.push(new Int16Array(D));for(let u=0;u<s;u++){const{adpcmCoefficients:m}=d[u],I=p[u],c=[];if(n===2){const k=I[0],{yn1:U,yn2:st}=o[u][t];let W=k,v=U,V=st,_=0;for(let j=0;j<D;){let y=0;j%14===0&&(W=I[_++]),(j++&1)===0?y=I[_]>>4:y=I[_++]&15,y>=8&&(y-=16);const et=1<<(W&15),X=W>>4<<1;y=1024+(et*y<<11)+m[J(X,0,15)]*v+m[J(X+1,0,15)]*V>>11,V=v,v=J(y,-32768,32767),c.push(v);}t<h-1&&(o[u][t+1].yn1=c[D-1],o[u][t+1].yn2=c[D-2]);}else if(n===1)for(let k=0;k<D;k++){const U=b(a(I,k*2,2,this.endianness));c.push(U);}else if(n===0)for(let k=0;k<D;k++)c.push(b(I[k])*256);else throw new Error("Invalid codec");f[u].set(c);}return e(this,x)[t]=f,f};exports.Brstm=it;
-	});
-
-	var eventTypes = createCommonjsModule(function (module, exports) {
-	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.PlayerEvent = void 0;
-	(function (PlayerEvent) {
-	    PlayerEvent["start"] = "brstm_start";
-	    PlayerEvent["play"] = "brstm_play";
-	    PlayerEvent["pause"] = "brstm_pause";
-	    PlayerEvent["playPause"] = "brstm_playpause";
-	    PlayerEvent["stop"] = "brstm_stop";
-	    PlayerEvent["next"] = "brstm_next";
-	    PlayerEvent["previous"] = "brstm_previous";
-	    PlayerEvent["seek"] = "brstm_seek";
-	    PlayerEvent["setLoop"] = "brstm_setloop";
-	    PlayerEvent["setVolume"] = "brstm_setvolume";
-	    PlayerEvent["buffering"] = "brstm_buffering";
-	    PlayerEvent["loading"] = "brstm_loading";
-	    PlayerEvent["loaded"] = "brstm_loaded";
-	    PlayerEvent["killed"] = "brstm_killed";
-	    PlayerEvent["step"] = "brstm_step";
-	    PlayerEvent["resetState"] = "brstm_resetstate";
-	    PlayerEvent["playlistAdd"] = "brstm_playlist_add";
-	    PlayerEvent["playlistRemove"] = "brstm_playlist_remove";
-	})(exports.PlayerEvent || (exports.PlayerEvent = {}));
-	});
-
 	var brstm_1 = brstm;
 
 	var player$1 = createCommonjsModule(function (module, exports) {
@@ -451,13 +451,13 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	exports.BrstmPlayer = void 0;
 	// This script shouldn't do anything without explicit user interaction (Triggering playback)
 
+
+
 	const copyToChannelPolyfill_1 = __importDefault(copyToChannelPolyfill);
+
 	const resampler_1 = __importDefault(resampler);
+
 	const webAudioUnlock_1 = __importDefault(webAudioUnlock);
-
-
-
-
 	function partitionedGetSamples(brstm, start, size) {
 	    let samples = [];
 	    let got = 0;
@@ -489,10 +489,14 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	            paused: false,
 	            stopped: false,
 	            enableLoop: false,
+	            loopCount: 0,
+	            loopFor: Number.MAX_SAFE_INTEGER,
 	            streamCancel: false,
 	            playAudioRunning: false,
 	            volume: Number(localStorage.getItem("volumeoverride")) || 1,
 	            samplesReady: 0,
+	            isCrossfading: false,
+	            crossfade: false,
 	        };
 	        this._audio = document.createElement("audio");
 	        this._audio.id = configProvider.PLAYER_TAG_ID;
@@ -665,6 +669,12 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	    getSongLength() {
 	        return this.totalSamples / this.sampleRate;
 	    }
+	    crossfadeStep() {
+	        this.decVolume(0.01);
+	        if (this._state.volume <= 0) {
+	            this.stop();
+	        }
+	    }
 	    setVolume(level) {
 	        this._state.volume = level;
 	        this.sendEvent(eventTypes.PlayerEvent.setVolume, {
@@ -701,10 +711,12 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	        });
 	        this.sendUpdateStateEvent();
 	    }
-	    setLoop(enable) {
-	        this._state.enableLoop = enable;
+	    setLoop(loopType, loopFor) {
+	        this._state.loopType = loopType;
+	        this._state.loopFor = loopFor || Number.MAX_SAFE_INTEGER;
 	        this.sendEvent(eventTypes.PlayerEvent.setLoop, {
-	            loop: enable,
+	            loopType,
+	            loopFor,
 	        });
 	        this.sendUpdateStateEvent();
 	    }
@@ -712,14 +724,48 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	        this._state.stopped = true;
 	        this.sendEvent(eventTypes.PlayerEvent.stop);
 	    }
-	    play(url, song) {
+	    shouldLoop() {
+	        let loopNow = false;
+	        switch (this._state.loopType) {
+	            case "count":
+	                loopNow = this._state.loopCount < this._state.loopFor;
+	                break;
+	            case "time":
+	                loopNow = this._state.loopCount * (this.totalSamples / this.sampleRate) < this._state.loopFor;
+	                break;
+	            case "none":
+	                loopNow = false;
+	                break;
+	            case "infinite":
+	                return true;
+	        }
+	        if (!loopNow && this._state.crossfade) {
+	            this._state.isCrossfading = true;
+	            return true; // loop one last time
+	        }
+	        this._state.loopCount += 1;
+	        return loopNow;
+	    }
+	    restartState() {
+	        this._state = Object.assign(Object.assign({}, this._state), { volume: 1, isCrossfading: false, loopCount: 0, stopped: false });
+	    }
+	    play(url, options) {
 	        return __awaiter(this, void 0, void 0, function* () {
-	            this.sendEvent(eventTypes.PlayerEvent.play, Object.assign(Object.assign({}, song), { url: url }));
+	            this.sendEvent(eventTypes.PlayerEvent.play, {
+	                url: url,
+	            });
+	            this.restartState();
 	            this._state.capabilities = yield (0, browserCapabilities_1.browserCapabilities)();
+	            this._state.crossfade = options.crossfade;
+	            this._state.loopType = options.loopType;
+	            if (options.loopFor)
+	                this._state.loopFor = options.loopFor;
 	            // fetch details
-	            this._setMediaSessionData(song);
-	            if (this._state.capabilities.mediaSession) {
-	                navigator.mediaSession.playbackState = "playing";
+	            if (options.mediaControls) {
+	                this._setMediaSessionData(options.song);
+	                if (this._state.capabilities.mediaSession) {
+	                    navigator.mediaSession.playbackState = "playing";
+	                }
 	            }
 	            // Entry point to the
 	            this._state.stopped = false;
@@ -838,6 +884,9 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	                // This will be filled using the below code for handling looping
 	                if (this._state.playbackCurrentSample + loadBufferSize <
 	                    this._state.brstm.metadata.totalSamples) {
+	                    // Step crossfader, if enabled
+	                    if (this._state.isCrossfading)
+	                        this.crossfadeStep();
 	                    // Standard codepath if no loop
 	                    // Populate samples with enough that we can just play it (or resample + play it) without glitches
 	                    samples = partitionedGetSamples(this._state.brstm, this._state.playbackCurrentSample, loadBufferSize);
@@ -847,7 +896,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	                else {
 	                    // We are reaching EOF
 	                    // Check if we have looping enabled
-	                    if (this._state.enableLoop) {
+	                    if (this.shouldLoop()) {
 	                        // First, get all the samples to the end of the file
 	                        samples = partitionedGetSamples(this._state.brstm, this._state.playbackCurrentSample, this._state.brstm.metadata.totalSamples -
 	                            this._state.playbackCurrentSample);

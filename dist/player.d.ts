@@ -6,6 +6,14 @@ export interface Song {
     game_name: string;
     game_id: number;
 }
+export interface Options {
+    loopType: LoopType;
+    loopFor?: number;
+    crossfade: boolean;
+    mediaControls: boolean;
+    song?: Song;
+}
+export type LoopType = "infinite" | "count" | "time" | "none";
 export declare class BrstmPlayer {
     constructor();
     private _state;
@@ -18,13 +26,16 @@ export declare class BrstmPlayer {
     get totalSamples(): number;
     get sampleRate(): number;
     getSongLength(): number;
+    crossfadeStep(): void;
     setVolume(level: number): void;
     incVolume(step: number): void;
     decVolume(step: number): void;
     seek(to: number): void;
     playPause(): void;
-    setLoop(enable: boolean): void;
+    setLoop(loopType: LoopType, loopFor?: number): void;
     stop(): void;
-    play(url: string, song?: Song): Promise<void>;
+    shouldLoop(): boolean;
+    restartState(): void;
+    play(url: string, options: Options): Promise<void>;
     _setMediaSessionData(song?: Song): Promise<void>;
 }
