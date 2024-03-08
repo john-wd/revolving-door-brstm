@@ -36,6 +36,6 @@ export declare class BrstmPlayer {
     stop(): void;
     shouldLoop(): boolean;
     restartState(): void;
-    play(url: string, options: Options): Promise<void>;
+    play(url: string, options?: Options): Promise<void>;
     _setMediaSessionData(song?: Song): Promise<void>;
 }

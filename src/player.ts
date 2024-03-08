@@ -381,23 +381,25 @@ export class BrstmPlayer {
     }
   }
 
-  async play(url: string, options: Options) {
+  async play(url: string, options?: Options) {
     this.sendEvent(PlayerEvent.play, {
       url: url,
     });
     this.restartState()
     this._state.capabilities = await browserCapabilities();
 
-    this._state.crossfade = options.crossfade;
-    this._state.loopType = options.loopType;
-    if (options.loopFor)
-      this._state.loopFor = options.loopFor;
+    if (options) {
+      this._state.crossfade = options.crossfade;
+      this._state.loopType = options.loopType;
+      if (options.loopFor)
+        this._state.loopFor = options.loopFor;
 
-    // fetch details
-    if (options.mediaControls) {
-      this._setMediaSessionData(options.song);
-      if (this._state.capabilities.mediaSession) {
-        navigator.mediaSession.playbackState = "playing";
+      // fetch details
+      if (options.mediaControls) {
+        this._setMediaSessionData(options.song);
+        if (this._state.capabilities.mediaSession) {
+          navigator.mediaSession.playbackState = "playing";
+        }
       }
     }
 

@@ -756,15 +756,17 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	            });
 	            this.restartState();
 	            this._state.capabilities = yield (0, browserCapabilities_1.browserCapabilities)();
-	            this._state.crossfade = options.crossfade;
-	            this._state.loopType = options.loopType;
-	            if (options.loopFor)
-	                this._state.loopFor = options.loopFor;
-	            // fetch details
-	            if (options.mediaControls) {
-	                this._setMediaSessionData(options.song);
-	                if (this._state.capabilities.mediaSession) {
-	                    navigator.mediaSession.playbackState = "playing";
+	            if (options) {
+	                this._state.crossfade = options.crossfade;
+	                this._state.loopType = options.loopType;
+	                if (options.loopFor)
+	                    this._state.loopFor = options.loopFor;
+	                // fetch details
+	                if (options.mediaControls) {
+	                    this._setMediaSessionData(options.song);
+	                    if (this._state.capabilities.mediaSession) {
+	                        navigator.mediaSession.playbackState = "playing";
+	                    }
 	                }
 	            }
 	            // Entry point to the
