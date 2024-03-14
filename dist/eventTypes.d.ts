@@ -3,9 +3,8 @@ export declare enum PlayerEvent {
     play = "brstm_play",
     pause = "brstm_pause",
     playPause = "brstm_playpause",
-    stop = "brstm_stop",
     next = "brstm_next",
-    previous = "brstm_previous",
+    stop = "brstm_stop",
     seek = "brstm_seek",
     setLoop = "brstm_setloop",
     setVolume = "brstm_setvolume",
@@ -14,7 +13,5 @@ export declare enum PlayerEvent {
     loaded = "brstm_loaded",
     killed = "brstm_killed",
     step = "brstm_step",
-    resetState = "brstm_resetstate",
-    playlistAdd = "brstm_playlist_add",
-    playlistRemove = "brstm_playlist_remove"
+    resetState = "brstm_resetstate"
 }

@@ -117,9 +117,8 @@
 	    PlayerEvent["play"] = "brstm_play";
 	    PlayerEvent["pause"] = "brstm_pause";
 	    PlayerEvent["playPause"] = "brstm_playpause";
-	    PlayerEvent["stop"] = "brstm_stop";
 	    PlayerEvent["next"] = "brstm_next";
-	    PlayerEvent["previous"] = "brstm_previous";
+	    PlayerEvent["stop"] = "brstm_stop";
 	    PlayerEvent["seek"] = "brstm_seek";
 	    PlayerEvent["setLoop"] = "brstm_setloop";
 	    PlayerEvent["setVolume"] = "brstm_setvolume";
@@ -129,8 +128,6 @@
 	    PlayerEvent["killed"] = "brstm_killed";
 	    PlayerEvent["step"] = "brstm_step";
 	    PlayerEvent["resetState"] = "brstm_resetstate";
-	    PlayerEvent["playlistAdd"] = "brstm_playlist_add";
-	    PlayerEvent["playlistRemove"] = "brstm_playlist_remove";
 	})(exports.PlayerEvent || (exports.PlayerEvent = {}));
 	});
 
@@ -496,6 +493,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	            volume: Number(localStorage.getItem("volumeoverride")) || 1,
 	            samplesReady: 0,
 	            isCrossfading: false,
+	            musicEnded: false,
 	            crossfade: false,
 	        };
 	        this._audio = document.createElement("audio");
@@ -722,7 +720,10 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	    }
 	    stop() {
 	        this._state.stopped = true;
-	        this.sendEvent(eventTypes.PlayerEvent.stop);
+	        if (this._state.musicEnded)
+	            this.sendEvent(eventTypes.PlayerEvent.next);
+	        else
+	            this.sendEvent(eventTypes.PlayerEvent.stop);
 	    }
 	    shouldLoop() {
 	        let loopNow = false;
@@ -739,9 +740,12 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	            case "infinite":
 	                return true;
 	        }
-	        if (!loopNow && this._state.crossfade) {
-	            this._state.isCrossfading = true;
-	            return true; // loop one last time
+	        if (!loopNow) {
+	            if (this._state.crossfade) {
+	                this._state.isCrossfading = true;
+	                return true; // loop one last time
+	            }
+	            this._state.musicEnded = true;
 	        }
 	        this._state.loopCount += 1;
 	        return loopNow;
@@ -935,9 +939,7 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	                        // Tell the player that on the next iteration we are at the start and paused
 	                        this._state.playbackCurrentSample = 0;
 	                        this._state.paused = true;
-	                        setTimeout(() => {
-	                            this._state.audioContext.suspend();
-	                        }, 200);
+	                        this.stop();
 	                    }
 	                }
 	                // In files with too many channels, we just play the first 2 channels

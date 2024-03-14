@@ -61,6 +61,7 @@ interface State {
   samplesReady: number; // How many samples the streamer loaded
   crossfade: boolean; // should crossfade at the end
   isCrossfading: boolean; // at the end of the music, crossfade
+  musicEnded: boolean;
 }
 
 export interface Options {
@@ -96,6 +97,7 @@ export class BrstmPlayer {
       volume: Number(localStorage.getItem("volumeoverride")) || 1,
       samplesReady: 0,
       isCrossfading: false,
+      musicEnded: false,
       crossfade: false,
     };
     this._audio = document.createElement("audio");
@@ -345,7 +347,10 @@ export class BrstmPlayer {
   }
   stop() {
     this._state.stopped = true;
-    this.sendEvent(PlayerEvent.stop);
+    if (this._state.musicEnded)
+      this.sendEvent(PlayerEvent.next)
+    else
+      this.sendEvent(PlayerEvent.stop);
   }
 
   shouldLoop(): boolean {
@@ -363,9 +368,12 @@ export class BrstmPlayer {
       case "infinite":
         return true
     }
-    if (!loopNow && this._state.crossfade) {
-      this._state.isCrossfading = true
-      return true // loop one last time
+    if (!loopNow) {
+      if (this._state.crossfade) {
+        this._state.isCrossfading = true
+        return true // loop one last time
+      }
+      this._state.musicEnded = true
     }
     this._state.loopCount += 1
     return loopNow
@@ -631,9 +639,7 @@ export class BrstmPlayer {
           // Tell the player that on the next iteration we are at the start and paused
           this._state.playbackCurrentSample = 0;
           this._state.paused = true;
-          setTimeout(() => {
-            this._state.audioContext.suspend();
-          }, 200);
+          this.stop()
         }
       }
 

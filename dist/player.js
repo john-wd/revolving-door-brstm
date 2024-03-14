@@ -60,6 +60,7 @@ class BrstmPlayer {
             volume: Number(localStorage.getItem("volumeoverride")) || 1,
             samplesReady: 0,
             isCrossfading: false,
+            musicEnded: false,
             crossfade: false,
         };
         this._audio = document.createElement("audio");
@@ -286,7 +287,10 @@ class BrstmPlayer {
     }
     stop() {
         this._state.stopped = true;
-        this.sendEvent(eventTypes_1.PlayerEvent.stop);
+        if (this._state.musicEnded)
+            this.sendEvent(eventTypes_1.PlayerEvent.next);
+        else
+            this.sendEvent(eventTypes_1.PlayerEvent.stop);
     }
     shouldLoop() {
         let loopNow = false;
@@ -303,9 +307,12 @@ class BrstmPlayer {
             case "infinite":
                 return true;
         }
-        if (!loopNow && this._state.crossfade) {
-            this._state.isCrossfading = true;
-            return true; // loop one last time
+        if (!loopNow) {
+            if (this._state.crossfade) {
+                this._state.isCrossfading = true;
+                return true; // loop one last time
+            }
+            this._state.musicEnded = true;
         }
         this._state.loopCount += 1;
         return loopNow;
@@ -499,9 +506,7 @@ class BrstmPlayer {
                         // Tell the player that on the next iteration we are at the start and paused
                         this._state.playbackCurrentSample = 0;
                         this._state.paused = true;
-                        setTimeout(() => {
-                            this._state.audioContext.suspend();
-                        }, 200);
+                        this.stop();
                     }
                 }
                 // In files with too many channels, we just play the first 2 channels
