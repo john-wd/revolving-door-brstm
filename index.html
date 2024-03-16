@@ -1,23 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <title>Test</title>
-    <link rel="stylesheet" href="player.css">
+  <meta charset="UTF-8" />
+  <title>Test</title>
+  <link rel="stylesheet" href="player.css" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
 </head>
+
 <body>
-Song id:<input type="number" min="0" max="99999" value="59060" id="aaa">
-<a href="#" onclick="window.player.play('https://smashcustommusic.net/brstm/' + document.querySelector('#aaa').value + '&noIncrement=1')">asdf</a>
-    <script src="dist/bundle.min.js?version=202"></script>
-<script>
+  Song id:<input type="number" min="0" max="99999" value="25772" id="song" />
+  <br />
+  <div>
+    <button href="#" onclick="playSong(document.querySelector(`#song`).value)">
+      <span class="material-icons">play_arrow</span>
+    </button>
+    <button onclick="window.player.playPause()">
+      <span class="material-icons">pause</span>
+    </button>
+    <button onclick="window.player.stop()">
+      <span class="material-icons">stop</span>
+    </button>
+    <button onclick="window.player.decVolume(.1)">
+      <span class="material-icons">volume_down</span>
+    </button>
+    <button onclick="window.player.incVolume(.1)">
+      <span class="material-icons">volume_up</span>
+    </button>
+  </div>
+  <script src="bundle/bundle.min.js"></script>
+  <script>
     if (window.location.hash.length > 1) {
-        if (window.location.hash.startsWith("#eval")) {
-            eval(decodeURIComponent(window.location.hash.slice(5)));
-        } else {
-            let z = window.location.hash.slice(1);
-            window.player.play('https://smashcustommusic.net/brstm/' + z + '&noIncrement=1');
-        }
+      if (window.location.hash.startsWith("#eval")) {
+        eval(decodeURIComponent(window.location.hash.slice(5)));
+      } else {
+        let z = window.location.hash.slice(1);
+        window.player.play(z);
+      }
     }
-</script>
+    async function fetchSong(id) {
+      return fetch(`https://smashcustommusic.net/json/song/${id}`);
+    }
+    async function playSong(id) {
+      fetchSong(id).then(async (resp) => {
+        if (resp.status >= 400) {
+          return;
+        }
+        song = await resp.json();
+        window.player.play(
+          `https://smashcustommusic.net/brstm/${id}`,
+          {
+            loopType: "count",
+            loopFor: 1,
+            crossfade: true,
+          });
+      });
+    }
+  </script>
 </body>
+
 </html>

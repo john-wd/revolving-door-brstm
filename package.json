@@ -1,21 +1,31 @@
 {
-  "name": "revolving-door",
+  "name": "web-brstm-player",
   "version": "1.0.0",
   "description": "A web-based BRSTM player",
-  "main": "index.js",
-  "repository": "https://github.com/rphsoftware/revolving-door.git",
-  "author": "rph <rphsoftware@gmail.com>",
+  "repository": "https://github.com/john-wd/revolving-door-brstm.git",
+  "author": "JohnW",
   "license": "GPL-2.0",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^17.0.0",
     "@rollup/plugin-node-resolve": "^11.0.1",
-    "rollup-plugin-terser": "^7.0.2"
+    "@types/estree": "^0.0.47",
+    "rollup-plugin-terser": "^7.0.2",
+    "source-map-loader": "^4.0.1",
+    "ts-loader": "^9.4.2",
+    "tslint": "^6.1.3",
+    "typescript": "^4.9.3"
   },
   "scripts": {
-    "build": "rollup --config rollup.config.js"
+    "build": "tsc && rollup --config rollup.config.js"
   },
   "dependencies": {
-    "brstm": "^1.4.0",
+    "brstm": "^1.7.0",
     "rollup": "^2.45.2"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./dist/player": "./dist/player.js"
   }
 }

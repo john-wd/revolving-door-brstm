@@ -1,23 +1,26 @@
-const ge = require('./gestureEngine');
+import { PLAYER_TAG_ID } from "./configProvider";
+import { PlayerEvent } from "./eventTypes";
+const ge = require("./gestureEngine").getInstance();
 
 let state = {
-    position: 0,
-    samples: 1e6,
-    loaded: 5e5,
-    volume: 1,
-    paused: false,
+  display: false,
+  position: 0,
+  samples: 1e6,
+  loaded: 5e5,
+  volume: 1,
+  paused: false,
 
-    ready: false,
-    buffering: false,
-    sampleRate: 4.8e4,
-    looping: false,
-    streamingDied: false
+  ready: false,
+  buffering: false,
+  sampleRate: 4.8e4,
+  looping: false,
+  streamingDied: false,
 };
 
 let overrides = {
-    volume: null,
-    position: null
-}
+  volume: null,
+  position: null,
+};
 
 let api = {};
 
@@ -27,108 +30,115 @@ let guiElement = null;
 let lastY = -30;
 
 function hEvent(a) {
-    try { a.preventDefault(); } catch(e) {}
-    if (a.targetTouches.length > 0) {
-        let box = a.targetTouches[0].target.getBoundingClientRect();
-        let pos = (a.targetTouches[0].clientY + a.targetTouches[0].radiusY) - box.top;
-        if (pos < 5) pos = 0;
-        if (pos > 80) pos = 84;
+  try {
+    a.preventDefault();
+  } catch (e) {}
+  if (a.targetTouches.length > 0) {
+    let box = a.targetTouches[0].target.getBoundingClientRect();
+    let pos = a.targetTouches[0].clientY + a.targetTouches[0].radiusY - box.top;
+    if (pos < 5) pos = 0;
+    if (pos > 80) pos = 84;
 
-        let volume = 1 - (pos / 84);
-        overrides.volume = volume;
-        if (a.type === "touchend") {
-            state.volume = overrides.volume;
-            api.setVolume(overrides.volume);
-            overrides.volume = null;
-            localStorage.setItem("volumeoverride", volume);
-        }
-        module.exports.guiUpdate();
-    } else {
-        if (a.type === "touchend") {
-            state.volume = overrides.volume;
-            api.setVolume(overrides.volume);
-            overrides.volume = null;
-        }
+    let volume = 1 - pos / 84;
+    overrides.volume = volume;
+    if (a.type === "touchend") {
+      state.volume = overrides.volume;
+      api.setVolume(overrides.volume);
+      overrides.volume = null;
+      localStorage.setItem("volumeoverride", volume);
     }
+    guiUpdate();
+  } else {
+    if (a.type === "touchend") {
+      state.volume = overrides.volume;
+      api.setVolume(overrides.volume);
+      overrides.volume = null;
+    }
+  }
 }
 
 function hsEvent(a) {
-    try { a.preventDefault(); } catch(e) {}
-    if (a.targetTouches.length > 0) {
-        let box = a.targetTouches[0].target.getBoundingClientRect();
-        let pos = (a.targetTouches[0].clientX + a.targetTouches[0].radiusX) - box.left;
+  try {
+    a.preventDefault();
+  } catch (e) {}
+  if (a.targetTouches.length > 0) {
+    let box = a.targetTouches[0].target.getBoundingClientRect();
+    let pos =
+      a.targetTouches[0].clientX + a.targetTouches[0].radiusX - box.left;
 
-        if (pos < 5) pos = 0;
-        if (pos > 254) pos = 254;
+    if (pos < 5) pos = 0;
+    if (pos > 254) pos = 254;
 
-        pos = Math.round(pos);
-        if (pos === lastY) return;
-        lastY = pos;
+    pos = Math.round(pos);
+    if (pos === lastY) return;
+    lastY = pos;
 
-        let posi = state.samples * (pos / 254);
-        if (posi < state.loaded) {
-            overrides.position = posi;
-        }
-
-        if (a.type === "touchend") {
-            api.seek(overrides.position);
-            overrides.position = null;
-        }
-
-        module.exports.guiUpdate();
-    } else {
-        if (a.type === "touchend") {
-            api.seek(overrides.position);
-            overrides.position = null;
-        }
+    let posi = state.samples * (pos / 254);
+    if (posi < state.loaded) {
+      overrides.position = posi;
     }
+
+    if (a.type === "touchend") {
+      api.seek(overrides.position);
+      overrides.position = null;
+    }
+
+    guiUpdate();
+  } else {
+    if (a.type === "touchend") {
+      api.seek(overrides.position);
+      overrides.position = null;
+    }
+  }
 }
 
 function seekOp(x, y) {
-    let pos = Math.round(x);
-    let posi = state.samples * (pos / 254);
-    if (posi < state.loaded) {
-        overrides.position = posi;
-    }
-    module.exports.guiUpdate();
+  let pos = Math.round(x);
+  let posi = state.samples * (pos / 254);
+  if (posi < state.loaded) {
+    overrides.position = posi;
+  }
+  guiUpdate();
 }
 
 function seekFin(x, y) {
-    let pos = Math.round(x);
-    let posi = state.samples * (pos / 254);
-    if (posi < state.loaded) {
-        overrides.position = posi;
-    }
-    api.seek(posi);
-    overrides.position = null;
-    module.exports.guiUpdate();
+  let pos = Math.round(x);
+  let posi = state.samples * (pos / 254);
+  if (posi < state.loaded) {
+    overrides.position = posi;
+  }
+  api.seek(posi);
+  overrides.position = null;
+  guiUpdate();
 }
 
 function volOp(x, y) {
-    y = Math.round(y);
-    overrides.volume = 1 - (y / 84);
-    module.exports.guiUpdate();
+  y = Math.round(y);
+  overrides.volume = 1 - y / 84;
+  guiUpdate();
 }
 
 function volFin(x, y) {
-    y = Math.round(y);
-    let volume = 1 - (y / 84);
-    overrides.volume = null;
-    localStorage.setItem("volumeoverride", volume);
-    api.setVolume(volume);
-    module.exports.guiUpdate();
+  y = Math.round(y);
+  let volume = 1 - y / 84;
+  overrides.volume = null;
+  localStorage.setItem("volumeoverride", volume);
+  api.setVolume(volume);
+  guiUpdate();
 }
 
-module.exports.updateState = function(newState) {
-    Object.assign(state, newState);
-};
+function updateState(newState) {
+  Object.assign(state, newState);
+}
 
-module.exports.runGUI = function(a) {
-    api = a;
-    // Creating GUI
-    guiElement = document.createElement("div");
-    guiElement.classList.add("guiholder");
-    guiElement.innerHTML = `
+function runGUI(a) {
+  addEventHandlers();
+  api = a;
+  // Creating GUI
+  guiElement = document.createElement("div");
+  guiElement.style.display = "none";
+  guiElement.classList.add("guiholder");
+  guiElement.innerHTML = `
 <div class="error" style="display: none">
     <h3>Playback failed!</h3>
     <h3>Reload the page and try again.</h3>
@@ -161,40 +171,43 @@ module.exports.runGUI = function(a) {
         <a class="pl-loop-text" target="_blank" href="https://smashcustommusic.net/feedback/">Send feedback</a>
         <a class="pl-loop-text" target="_blank" href="https://github.com/rphsoftware/revolving-door">v2 by Rph</a>
     </div>
-</div>`
+</div>`;
 
-    document.body.appendChild(guiElement);
+  document.body.appendChild(guiElement);
 
-    volumeCtx = document.querySelector("#pl-volume").getContext("2d");
-    barCtx = document.querySelector("#pl-seek").getContext("2d");
+  volumeCtx = document.querySelector("#pl-volume").getContext("2d");
+  barCtx = document.querySelector("#pl-seek").getContext("2d");
 
-    document.querySelector("#pl-volume").addEventListener("touchstart",hEvent);
-    document.querySelector("#pl-volume").addEventListener("touchmove", hEvent);
-    document.querySelector("#pl-volume").addEventListener("touchend", hEvent);
+  document.querySelector("#pl-volume").addEventListener("touchstart", hEvent);
+  document.querySelector("#pl-volume").addEventListener("touchmove", hEvent);
+  document.querySelector("#pl-volume").addEventListener("touchend", hEvent);
 
-    document.querySelector("#pl-seek").addEventListener("touchstart",hsEvent);
-    document.querySelector("#pl-seek").addEventListener("touchmove", hsEvent);
-    document.querySelector("#pl-seek").addEventListener("touchend", hsEvent);
+  document.querySelector("#pl-seek").addEventListener("touchstart", hsEvent);
+  document.querySelector("#pl-seek").addEventListener("touchmove", hsEvent);
+  document.querySelector("#pl-seek").addEventListener("touchend", hsEvent);
 
-    document.querySelector("#pl-pause-play").addEventListener("click", function() {
-        api.pause();
-        module.exports.guiUpdate();
+  document
+    .querySelector("#pl-pause-play")
+    .addEventListener("click", function () {
+      api.playPause();
+      guiUpdate();
     });
 
-    document.querySelector("#pl-loop-box").addEventListener("input", function() {
-        state.looping = document.querySelector("#pl-loop-box").checked;
-        api.setLoop(state.looping);
-    });
+  document.querySelector("#pl-loop-box").addEventListener("input", function () {
+    state.looping = document.querySelector("#pl-loop-box").checked;
+    api.setLoop(state.looping);
+  });
 
-    guiElement.addEventListener("drag", function(e) { e.preventDefault(); });
+  guiElement.addEventListener("drag", function (e) {
+    e.preventDefault();
+  });
 
-    ge.runGestureEngine();
-
-    ge.registerOpEvent("seek", seekOp);
-    ge.registerFinEvent("seek", seekFin);
-    ge.registerOpEvent("volume", volOp);
-    ge.registerFinEvent("volume", volFin);
-};
+  ge.runGestureEngine();
+  ge.registerOpEvent("seek", seekOp);
+  ge.registerFinEvent("seek", seekFin);
+  ge.registerOpEvent("volume", volOp);
+  ge.registerFinEvent("volume", volFin);
+}
 
 let lastShowLoading = null;
 let lastReady = null;
@@ -207,86 +220,190 @@ let lastLooping = null;
 let lastLoaded = -1;
 let lastStreamState = null;
 
-module.exports.guiUpdate = function() {
-    if (guiElement) {
-        if (lastStreamState !== state.streamingDied) {
-            guiElement.querySelector(".error").style.display = state.streamingDied ? "flex":"none";
-            lastStreamState = state.streamingDied;
-        }
-        let showLoading = (state.buffering || !state.ready);
-        if (lastShowLoading !== showLoading) {
-            guiElement.querySelector("#gui-loading-bar").dataset.exists = showLoading;
-
-            lastShowLoading = showLoading;
-        }
-
-        if (lastReady !== state.ready) {
-            guiElement.querySelector(".guistate[data-guistate=\"preload\"]").style.display = state.ready ? "none" : "block";
-            guiElement.querySelector(".guistate[data-guistate=\"ready\"]").style.display = !state.ready ? "none" : "grid";
-            lastReady = state.ready;
-        }
-
-        if (!state.ready) return;
-
-        let vol = Math.round(84 - (84 * state.volume));
-        if (overrides.volume !== null) {
-            vol = Math.round(84 - (84 * overrides.volume));
-        }
-        if (vol !== lastVolume) {
-            volumeCtx.fillStyle = "#444";
-            volumeCtx.fillRect(0, 0, 16, 84);
-
-            volumeCtx.fillStyle = "hsl(200, 85%, 55%)";
-            volumeCtx.fillRect(0, vol, 16, 84);
-
-            lastVolume = vol;
-        }
-
-        let pos = Math.ceil(((state.position / state.samples) * 254));
-        if (overrides.position !== null) {
-            pos = Math.ceil(((overrides.position / state.samples) * 254));
-        }
-        let loaded = Math.ceil(((state.loaded / state.samples) * 254));
-        if ((pos !== lastPosition) || (loaded !== lastLoaded)) {
-            barCtx.fillStyle = "#222";
-            barCtx.fillRect(0, 0, 254, 16);
-
-            barCtx.fillStyle = "#666";
-            barCtx.fillRect(0, 0, Math.min(254, loaded), 16);
-
-            barCtx.fillStyle = "hsl(200, 85%, 55%)";
-            barCtx.fillRect(0, 0, Math.min(254, pos), 16);
-
-            lastPosition = pos;
-            lastLoaded = loaded;
-        }
-
-        if (lastPaused !== state.paused) {
-            guiElement.querySelector("#pl-pause").style.display = state.paused ? "none" : "block";
-            guiElement.querySelector("#pl-play").style.display = !state.paused ? "none" : "block";
-            lastPaused = state.paused;
-        }
-
-        // Seconds in song
-        let secondsInSong =    Math.floor(state.samples / state.sampleRate);
-        let playbackSeconds = Math.floor(state.position / state.sampleRate);
-        if (overrides.position !== null) {
-            playbackSeconds = Math.floor(overrides.position / state.sampleRate);
-        }
-
-        if (secondsInSong !== lastLength) {
-            guiElement.querySelector("#pl-time-end").innerText = `${Math.floor(secondsInSong / 60)}:${(secondsInSong % 60).toString().padStart(2, "0")}`;
-            lastLength = secondsInSong;
-        }
-
-        if (playbackSeconds !== lastPositionS) {
-            guiElement.querySelector("#pl-time-start").innerText = `${Math.floor(playbackSeconds / 60)}:${(playbackSeconds % 60).toString().padStart(2, "0")}`;
-            lastPositionS = playbackSeconds;
-        }
-
-        if (lastLooping !== state.looping) {
-            guiElement.querySelector("#pl-loop-box").checked = state.looping;
-            lastLooping = state.looping;
-        }
-    }
+function destroyGui() {
+  if (guiElement) {
+    state.display = false;
+    guiElement.style.display = "none";
+  }
 }
+
+function guiUpdate() {
+  if (state.display) {
+    guiElement.style.display = "block";
+  }
+  if (guiElement) {
+    if (lastStreamState !== state.streamingDied) {
+      guiElement.querySelector(".error").style.display = state.streamingDied
+        ? "flex"
+        : "none";
+      lastStreamState = state.streamingDied;
+    }
+    let showLoading = state.buffering || !state.ready;
+    if (lastShowLoading !== showLoading) {
+      guiElement.querySelector("#gui-loading-bar").dataset.exists = showLoading;
+
+      lastShowLoading = showLoading;
+    }
+
+    if (lastReady !== state.ready) {
+      guiElement.querySelector(
+        '.guistate[data-guistate="preload"]'
+      ).style.display = state.ready ? "none" : "block";
+      guiElement.querySelector(
+        '.guistate[data-guistate="ready"]'
+      ).style.display = !state.ready ? "none" : "grid";
+      lastReady = state.ready;
+    }
+
+    if (!state.ready) return;
+
+    let vol = Math.round(84 - 84 * state.volume);
+    if (overrides.volume !== null) {
+      vol = Math.round(84 - 84 * overrides.volume);
+    }
+    if (vol !== lastVolume) {
+      volumeCtx.fillStyle = "#444";
+      volumeCtx.fillRect(0, 0, 16, 84);
+
+      volumeCtx.fillStyle = "hsl(200, 85%, 55%)";
+      volumeCtx.fillRect(0, vol, 16, 84);
+
+      lastVolume = vol;
+    }
+
+    let pos = Math.ceil((state.position / state.samples) * 254);
+    if (overrides.position !== null) {
+      pos = Math.ceil((overrides.position / state.samples) * 254);
+    }
+    let loaded = Math.ceil((state.loaded / state.samples) * 254);
+    if (pos !== lastPosition || loaded !== lastLoaded) {
+      barCtx.fillStyle = "#222";
+      barCtx.fillRect(0, 0, 254, 16);
+
+      barCtx.fillStyle = "#666";
+      barCtx.fillRect(0, 0, Math.min(254, loaded), 16);
+
+      barCtx.fillStyle = "hsl(200, 85%, 55%)";
+      barCtx.fillRect(0, 0, Math.min(254, pos), 16);
+
+      lastPosition = pos;
+      lastLoaded = loaded;
+    }
+
+    if (lastPaused !== state.paused) {
+      guiElement.querySelector("#pl-pause").style.display = state.paused
+        ? "none"
+        : "block";
+      guiElement.querySelector("#pl-play").style.display = !state.paused
+        ? "none"
+        : "block";
+      lastPaused = state.paused;
+    }
+
+    // Seconds in song
+    let secondsInSong = Math.floor(state.samples / state.sampleRate);
+    let playbackSeconds = Math.floor(state.position / state.sampleRate);
+    if (overrides.position !== null) {
+      playbackSeconds = Math.floor(overrides.position / state.sampleRate);
+    }
+
+    if (secondsInSong !== lastLength) {
+      guiElement.querySelector("#pl-time-end").innerText = `${Math.floor(
+        secondsInSong / 60
+      )}:${(secondsInSong % 60).toString().padStart(2, "0")}`;
+      lastLength = secondsInSong;
+    }
+
+    if (playbackSeconds !== lastPositionS) {
+      guiElement.querySelector("#pl-time-start").innerText = `${Math.floor(
+        playbackSeconds / 60
+      )}:${(playbackSeconds % 60).toString().padStart(2, "0")}`;
+      lastPositionS = playbackSeconds;
+    }
+
+    if (lastLooping !== state.looping) {
+      guiElement.querySelector("#pl-loop-box").checked = state.looping;
+      lastLooping = state.looping;
+    }
+  }
+}
+
+function addEventHandlers() {
+  let audio = document.getElementById(PLAYER_TAG_ID);
+  if (audio) {
+    audio.addEventListener(PlayerEvent.step, (evt) => {
+      state = {
+        ...state,
+        position: evt.detail.position,
+        paused: evt.detail.paused,
+        volume: evt.detail.volume,
+        loaded: evt.detail.loaded,
+        looping: evt.detail.looping,
+      };
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.killed, (evt) => {
+      state = {
+        ...state,
+        streamingDied: evt.detail.streamingDied,
+        buffering: evt.detail.buffering,
+        ready: evt.detail.ready,
+      };
+      destroyGui();
+    });
+    audio.addEventListener(PlayerEvent.setVolume, (evt) => {
+      state.volume = evt.detail.volume;
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.seek, (evt) => {
+      state.position = evt.detail.toSample;
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.playPause, (evt) => {
+      state.paused = evt.detail.playing;
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.setLoop, (evt) => {
+      state.looping = evt.detail.loop;
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.stop, (evt) => {
+      destroyGui();
+    });
+    audio.addEventListener(PlayerEvent.start, (evt) => {
+      state.loaded = evt.detail.loaded;
+      state.display = true;
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.resetState, (evt) => {
+      state = {
+        ...state,
+        ready: evt.detail.ready,
+        position: evt.detail.position,
+        samples: evt.detail.samples,
+        loaded: evt.detail.loaded,
+        volume: evt.detail.volume,
+        paused: evt.detail.paused,
+        buffering: evt.detail.buffering,
+        sampleRate: evt.detail.sampleRate,
+        streamingDied: evt.detail.streamingDied,
+      };
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.loaded, (evt) => {
+      state = {
+        ...state,
+        ready: evt.detail.ready,
+        samples: evt.detail.samples,
+        sampleRate: evt.detail.sampleRate,
+      };
+      guiUpdate();
+    });
+    audio.addEventListener(PlayerEvent.buffering, (evt) => {
+      state.buffering = evt.detail.buffering;
+      guiUpdate();
+    });
+  }
+}
+
+export { runGUI };

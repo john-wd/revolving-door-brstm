@@ -1,3 +1,7 @@
+# folders
 node_modules
+
+# files
 .idea
 yarn-error.log
+package-lock.json

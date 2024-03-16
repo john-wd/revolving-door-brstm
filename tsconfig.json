@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "outDir": "./dist",
+    "target": "es6",
+    "moduleResolution": "node",
+    "module": "commonjs",
+    "lib": ["es2017", "es7", "es6", "dom"],
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "allowJs": true
+  },
+  "include": ["./src/**/*"],
+  "exclude": ["node_modules/**/*"]
+}
