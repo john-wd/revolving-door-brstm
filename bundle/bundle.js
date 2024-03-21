@@ -776,6 +776,9 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	            // Entry point to the
 	            this._state.stopped = false;
 	            console.log(`Playing ${url}`);
+	            this.sendEvent(eventTypes.PlayerEvent.buffering, {
+	                buffering: true,
+	            });
 	            if (!this._state.hasInitialized) {
 	                this.sendEvent(eventTypes.PlayerEvent.start, {
 	                    loaded: this._state.samplesReady,

@@ -343,6 +343,9 @@ class BrstmPlayer {
             // Entry point to the
             this._state.stopped = false;
             console.log(`Playing ${url}`);
+            this.sendEvent(eventTypes_1.PlayerEvent.buffering, {
+                buffering: true,
+            });
             if (!this._state.hasInitialized) {
                 this.sendEvent(eventTypes_1.PlayerEvent.start, {
                     loaded: this._state.samplesReady,
