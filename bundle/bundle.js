@@ -750,15 +750,15 @@ style="stroke:#fff;stroke-width:5;stroke-linejoin:round;fill:#fff;"
 	        this._state.loopCount += 1;
 	        return loopNow;
 	    }
-	    restartState() {
-	        this._state = Object.assign(Object.assign({}, this._state), { volume: 1, isCrossfading: false, loopCount: 0, stopped: false });
+	    restartState(volume = 1) {
+	        this._state = Object.assign(Object.assign({}, this._state), { volume: volume, isCrossfading: false, loopCount: 0, stopped: false });
 	    }
 	    play(url, options) {
 	        return __awaiter(this, void 0, void 0, function* () {
 	            this.sendEvent(eventTypes.PlayerEvent.play, {
 	                url: url,
 	            });
-	            this.restartState();
+	            this.restartState((options === null || options === void 0 ? void 0 : options.volume) || 1);
 	            this._state.capabilities = yield (0, browserCapabilities_1.browserCapabilities)();
 	            if (options) {
 	                this._state.crossfade = options.crossfade;

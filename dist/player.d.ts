@@ -12,6 +12,7 @@ export interface Options {
     crossfade: boolean;
     mediaControls: boolean;
     song?: Song;
+    volume?: number;
 }
 export type LoopType = "infinite" | "count" | "time" | "none";
 export declare class BrstmPlayer {
@@ -35,7 +36,7 @@ export declare class BrstmPlayer {
     setLoop(loopType: LoopType, loopFor?: number): void;
     stop(): void;
     shouldLoop(): boolean;
-    restartState(): void;
+    restartState(volume?: number): void;
     play(url: string, options?: Options): Promise<void>;
     _setMediaSessionData(song?: Song): Promise<void>;
 }

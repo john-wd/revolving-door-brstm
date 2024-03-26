@@ -66,10 +66,11 @@ interface State {
 
 export interface Options {
   loopType: LoopType
-  loopFor?: number, // count or time in seconds
-  crossfade: boolean,
-  mediaControls: boolean, // whether to enable multimedia keyboard controls
+  loopFor?: number // count or time in seconds
+  crossfade: boolean
+  mediaControls: boolean // whether to enable multimedia keyboard controls
   song?: Song // song object to be used for multimedia info
+  volume?: number // which volume to set when playing a song, from 0 to 1
 }
 
 export type LoopType = "infinite" | "count" | "time" | "none"
@@ -379,10 +380,10 @@ export class BrstmPlayer {
     return loopNow
   }
 
-  restartState() {
+  restartState(volume: number = 1) {
     this._state = {
       ...this._state,
-      volume: 1,
+      volume: volume,
       isCrossfading: false,
       loopCount: 0,
       stopped: false,
@@ -393,7 +394,7 @@ export class BrstmPlayer {
     this.sendEvent(PlayerEvent.play, {
       url: url,
     });
-    this.restartState()
+    this.restartState(options?.volume || 1)
     this._state.capabilities = await browserCapabilities();
 
     if (options) {
